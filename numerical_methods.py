@@ -1,4 +1,3 @@
-# numerical_methods.py
 import numpy as np
 
 # ========================================
@@ -286,6 +285,112 @@ def lagrange_interpolation(x_data, y_data, x_target):
         result += term
     
     return result
+
+# ========================================
+# 3B. CUBIC SPLINE INTERPOLATION (MANUAL)
+# ========================================
+
+def cubic_spline_coefficients(x, y):
+    """
+    Menghitung koefisien cubic spline natural (S''(x0) = S''(xn) = 0)
+    
+    Untuk setiap interval [xi, xi+1], cubic spline didefinisikan sebagai:
+    S_i(x) = a_i + b_i(x-x_i) + c_i(x-x_i)^2 + d_i(x-x_i)^3
+    
+    Parameters:
+    - x: array titik x (harus sorted)
+    - y: array nilai fungsi di titik x
+    
+    Returns:
+    - dict berisi koefisien a, b, c, d untuk setiap interval
+    """
+    n = len(x) - 1  # jumlah interval
+    
+    # Step 1: Hitung h (jarak antar titik)
+    h = np.diff(x)
+    
+    # Step 2: Setup sistem persamaan untuk mencari c (second derivatives)
+    # Ax = B, dimana x adalah vektor c (coefficients untuk x^2)
+    A = np.zeros((n+1, n+1))
+    B = np.zeros(n+1)
+    
+    # Natural spline boundary conditions: c[0] = c[n] = 0
+    A[0, 0] = 1
+    A[n, n] = 1
+    
+    # Interior equations
+    for i in range(1, n):
+        A[i, i-1] = h[i-1]
+        A[i, i] = 2 * (h[i-1] + h[i])
+        A[i, i+1] = h[i]
+        B[i] = 3 * ((y[i+1] - y[i]) / h[i] - (y[i] - y[i-1]) / h[i-1])
+    
+    # Solve untuk c
+    c = np.linalg.solve(A, B)
+    
+    # Step 3: Hitung koefisien a, b, d
+    a = y[:-1].copy()
+    b = np.zeros(n)
+    d = np.zeros(n)
+    
+    for i in range(n):
+        b[i] = (y[i+1] - y[i]) / h[i] - h[i] * (2*c[i] + c[i+1]) / 3
+        d[i] = (c[i+1] - c[i]) / (3 * h[i])
+    
+    return {
+        'x': x,
+        'a': a,
+        'b': b,
+        'c': c[:-1],  # Exclude last c (not used)
+        'd': d
+    }
+
+def evaluate_cubic_spline(spline_coef, x_target):
+    """
+    Evaluasi cubic spline di titik x_target
+    
+    Parameters:
+    - spline_coef: dictionary dari cubic_spline_coefficients
+    - x_target: titik yang ingin dievaluasi (bisa scalar atau array)
+    
+    Returns:
+    - nilai interpolasi di x_target
+    """
+    x_knots = spline_coef['x']
+    a = spline_coef['a']
+    b = spline_coef['b']
+    c = spline_coef['c']
+    d = spline_coef['d']
+    
+    # Jika x_target adalah scalar
+    if np.isscalar(x_target):
+        # Find interval
+        if x_target < x_knots[0] or x_target > x_knots[-1]:
+            raise ValueError(f"x_target {x_target} outside interpolation range [{x_knots[0]}, {x_knots[-1]}]")
+        
+        # Binary search untuk interval
+        i = np.searchsorted(x_knots, x_target) - 1
+        i = max(0, min(i, len(a) - 1))
+        
+        dx = x_target - x_knots[i]
+        result = a[i] + b[i]*dx + c[i]*dx**2 + d[i]*dx**3
+        return result
+    
+    # Jika x_target adalah array
+    else:
+        results = np.zeros(len(x_target))
+        for idx, xt in enumerate(x_target):
+            if xt < x_knots[0] or xt > x_knots[-1]:
+                results[idx] = np.nan
+                continue
+            
+            i = np.searchsorted(x_knots, xt) - 1
+            i = max(0, min(i, len(a) - 1))
+            
+            dx = xt - x_knots[i]
+            results[idx] = a[i] + b[i]*dx + c[i]*dx**2 + d[i]*dx**3
+        
+        return results
 
 # ========================================
 # 4. REGRESI POLINOMIAL (MANUAL)

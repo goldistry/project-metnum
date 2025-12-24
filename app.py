@@ -114,30 +114,31 @@ if df_raw is not None:
         # Sidebar untuk kontrol segmen
         st.subheader("Pengaturan Parameter Integrasi")
         
-        col1, col2 = st.columns([1, 1])
+        # col1, col2 = st.columns([1, 1])
+        # col1, col2 = st.columns([1, 1])
         
-        with col1:
-            n_segments = st.slider(
-                "Jumlah Segmen untuk Adaptive Integration",
-                min_value=1,
-                max_value=20,
-                value=5,
-                help="Membagi data menjadi beberapa segmen untuk integrasi yang lebih akurat"
-            )
+        # with col1:
+        #     n_segments = st.slider(
+        #         "Jumlah Segmen untuk Adaptive Integration",
+        #         min_value=1,
+        #         max_value=20,
+        #         value=5,
+        #         help="Membagi data menjadi beberapa segmen untuk integrasi yang lebih akurat"
+        #     )
         
-        with col2:
-            show_comparison = st.checkbox("Tampilkan Perbandingan dengan NumPy", value=True)
+        # with col1:
+        show_comparison = st.checkbox("Tampilkan Perbandingan dengan NumPy", value=True)
         
         st.markdown("---")
         
         # Hitung integral dengan berbagai metode
-        val_rect_left = manual_rectangular(power, h, method='left')
-        val_rect_right = manual_rectangular(power, h, method='right')
-        val_rect_mid = manual_rectangular(power, h, method='midpoint')
+        # val_rect_left = manual_rectangular(power, h, method='left')
+        # val_rect_right = manual_rectangular(power, h, method='right')
+        # val_rect_mid = manual_rectangular(power, h, method='midpoint')
         val_trap = manual_trapezoidal(power, h)
         val_simp13 = manual_simpson_13(power, h)
         val_simp38 = manual_simpson_38(power, h)
-        val_adaptive = adaptive_integration(power, h, n_segments)
+        # val_adaptive = adaptive_integration(power, h, n_segments)
         
         # Nilai referensi
         val_numpy = np.trapz(power, dx=h)
@@ -153,21 +154,24 @@ if df_raw is not None:
         # Display hasil
         st.subheader("Hasil Perhitungan Integral")
         
-        col1, col2, col3, col4 = st.columns(4)
+        # col1, col2, col3, col4 = st.columns(4)
+        col1, col2 = st.columns(2)
+        # with col1:
+            # st.metric("Rectangular (Left)", f"{val_rect_left:.2f} kWh")
+            # st.metric("Rectangular (Right)", f"{val_rect_right:.2f} kWh")
         with col1:
-            st.metric("Rectangular (Left)", f"{val_rect_left:.2f} kWh")
-            st.metric("Rectangular (Right)", f"{val_rect_right:.2f} kWh")
-        with col2:
-            st.metric("Rectangular (Mid)", f"{val_rect_mid:.2f} kWh")
+            # st.metric("Rectangular (Mid)", f"{val_rect_mid:.2f} kWh")
             st.metric("Trapezoidal", f"{val_trap:.2f} kWh")
-        with col3:
             st.metric("Simpson 1/3", f"{val_simp13:.2f} kWh")
+        with col2:
             if val_simp38:
                 st.metric("Simpson 3/8", f"{val_simp38:.2f} kWh")
-        with col4:
-            st.metric("Adaptive (Segmented)", f"{val_adaptive:.2f} kWh")
             st.metric("Richardson Extrap.", f"{val_richardson:.2f} kWh", 
                      help="Menggunakan Richardson Extrapolation untuk akurasi lebih tinggi")
+        # with col3:
+            
+            # st.metric("Adaptive (Segmented)", f"{val_adaptive:.2f} kWh")
+            
         
         if show_comparison:
             st.info(f"NumPy Reference (np.trapz): {val_numpy:.2f} kWh")
@@ -175,10 +179,14 @@ if df_raw is not None:
         # Analisis Error
         st.subheader("Analisis Error (Menggunakan Richardson Extrapolation sebagai Referensi)")
         
-        methods = ['Rect (Left)', 'Rect (Right)', 'Rect (Mid)', 'Trapezoidal', 
-                   'Simpson 1/3', 'Adaptive', 'NumPy']
-        values = [val_rect_left, val_rect_right, val_rect_mid, val_trap, 
-                  val_simp13, val_adaptive, val_numpy]
+        # methods = ['Rect (Left)', 'Rect (Right)', 'Rect (Mid)', 'Trapezoidal', 
+        #            'Simpson 1/3', 'Adaptive', 'NumPy']
+        methods = ['Trapezoidal', 
+                   'Simpson 1/3', 'NumPy']
+        # values = [val_rect_left, val_rect_right, val_rect_mid, val_trap, 
+        #           val_simp13, val_adaptive, val_numpy]
+        values = [val_trap, 
+                  val_simp13, val_numpy]
         
         if val_simp38:
             methods.insert(-1, 'Simpson 3/8')
@@ -232,7 +240,6 @@ if df_raw is not None:
         - Metode Simpson 1/3 memberikan error terendah ({errors_rel[methods.index('Simpson 1/3')]:.4f}%)
         - Metode Rectangular memiliki error tertinggi karena aproksimasi paling sederhana
         - Richardson Extrapolation berhasil meningkatkan akurasi dengan menggabungkan hasil dari dua step size berbeda
-        - Adaptive integration dengan {n_segments} segmen memberikan hasil: {val_adaptive:.4f} kWh
         
         **Kesimpulan:**
         Untuk integrasi data power consumption, metode Simpson 1/3 atau Richardson Extrapolation
@@ -903,16 +910,19 @@ if df_raw is not None:
         st.subheader("1. Integrasi Numerik - Total Energi")
         
         summary_integration = pd.DataFrame({
-            'Metode': ['Simpson 1/3', 'Trapezoidal', 'Richardson', 'Adaptive'],
-            'Hasil (kWh)': [val_simp13, val_trap, val_richardson, val_adaptive],
+            # 'Metode': ['Simpson 1/3', 'Trapezoidal', 'Richardson', 'Adaptive'],
+            'Metode': ['Simpson 1/3', 'Trapezoidal', 'Richardson'],
+            # 'Hasil (kWh)': [val_simp13, val_trap, val_richardson, val_adaptive],
+            'Hasil (kWh)': [val_simp13, val_trap, val_richardson],
             'Relative Error (%)': [
                 abs(val_simp13 - exact_val) / exact_val * 100,
                 abs(val_trap - exact_val) / exact_val * 100,
                 0.0,
-                abs(val_adaptive - exact_val) / exact_val * 100
+                # abs(val_adaptive - exact_val) / exact_val * 100
             ],
-            'Kompleksitas': ['O(n)', 'O(n)', 'O(2n)', 'O(n)'],
-            'Rekomendasi': ['Akurasi Tinggi', 'Balance', 'Referensi', 'Fleksibel']
+            # 'Kompleksitas': ['O(n)', 'O(n)', 'O(2n)', 'O(n)'],
+            'Kompleksitas': ['O(n)', 'O(n)', 'O(2n)'],
+            'Rekomendasi': ['Akurasi Tinggi', 'Balance', 'Referensi']
         })
         
         st.dataframe(summary_integration, use_container_width=True)
@@ -1013,9 +1023,10 @@ if df_raw is not None:
         )
         
         # 1. Integrasi Methods Comparison
-        int_methods = ['Rectangular', 'Trapezoidal', 'Simpson 1/3', 'Richardson']
+        # int_methods = ['Rectangular', 'Trapezoidal', 'Simpson 1/3', 'Richardson']
+        int_methods = ['Trapezoidal', 'Simpson 1/3', 'Richardson']
         int_errors = [
-            abs(val_rect_mid - exact_val) / exact_val * 100,
+            # abs(val_rect_mid - exact_val) / exact_val * 100,
             abs(val_trap - exact_val) / exact_val * 100,
             abs(val_simp13 - exact_val) / exact_val * 100,
             0.0
@@ -1023,7 +1034,8 @@ if df_raw is not None:
         
         fig.add_trace(
             go.Bar(y=int_methods, x=int_errors, orientation='h',
-                  marker_color=['#ff9999', '#66b3ff', '#99ff99', '#ffcc99'],
+                  marker_color=['#66b3ff', '#99ff99', '#ffcc99'],
+                #   marker_color=['#ff9999', '#66b3ff', '#99ff99', '#ffcc99'],
                   hovertemplate='<b>%{y}</b><br>Error: %{x:.4f}%<extra></extra>',
                   showlegend=False),
             row=1, col=1

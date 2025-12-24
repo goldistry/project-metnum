@@ -1,31 +1,31 @@
 import numpy as np
 
 # ========================================
-# 1. INTEGRASI NUMERIK (MANUAL)
+# 1. INTEGRASI NUMERIK 
 # ========================================
 
-def manual_rectangular(y, h, method='left'):
-    """
-    Integrasi numerik menggunakan metode Rectangular (Riemann Sum)
+# def manual_rectangular(y, h, method='left'):
+#     """
+#     Integrasi numerik menggunakan metode Rectangular (Riemann Sum)
     
-    Parameters:
-    - y: array nilai fungsi
-    - h: step size
-    - method: 'left', 'right', atau 'midpoint'
+#     Parameters:
+#     - y: array nilai fungsi
+#     - h: step size
+#     - method: 'left', 'right', atau 'midpoint'
     
-    Returns:
-    - nilai integral
-    """
-    if method == 'left':
-        return h * sum(y[:-1])
-    elif method == 'right':
-        return h * sum(y[1:])
-    elif method == 'midpoint':
-        n = len(y) - 1
-        midpoints = [(y[i] + y[i+1]) / 2 for i in range(n)]
-        return h * sum(midpoints)
-    else:
-        return h * sum(y[:-1])
+#     Returns:
+#     - nilai integral
+#     """
+#     if method == 'left':
+#         return h * sum(y[:-1])
+#     elif method == 'right':
+#         return h * sum(y[1:])
+#     elif method == 'midpoint':
+#         n = len(y) - 1
+#         midpoints = [(y[i] + y[i+1]) / 2 for i in range(n)]
+#         return h * sum(midpoints)
+#     else:
+#         return h * sum(y[:-1])
 
 def manual_trapezoidal(y, h):
     """
@@ -96,46 +96,46 @@ def manual_simpson_38(y, h):
             total += 3 * y[i]
     return (3 * h / 8) * total
 
-def adaptive_integration(y, h, n_segments):
-    """
-    Integrasi dengan segmen yang dapat diatur
-    Membagi data menjadi n_segments dan mengintegrasikan dengan Simpson 1/3
+# def adaptive_integration(y, h, n_segments):
+#     """
+#     Integrasi dengan segmen yang dapat diatur
+#     Membagi data menjadi n_segments dan mengintegrasikan dengan Simpson 1/3
     
-    Parameters:
-    - y: array nilai fungsi
-    - h: step size original
-    - n_segments: jumlah segmen pembagian
+#     Parameters:
+#     - y: array nilai fungsi
+#     - h: step size original
+#     - n_segments: jumlah segmen pembagian
     
-    Returns:
-    - nilai integral
-    """
-    n_total = len(y)
-    points_per_segment = n_total // n_segments
+#     Returns:
+#     - nilai integral
+#     """
+#     n_total = len(y)
+#     points_per_segment = n_total // n_segments
     
-    if points_per_segment < 3:
-        # Jika terlalu sedikit, gunakan trapezoidal
-        return manual_trapezoidal(y, h)
+#     if points_per_segment < 3:
+#         # Jika terlalu sedikit, gunakan trapezoidal
+#         return manual_trapezoidal(y, h)
     
-    total_integral = 0
-    for i in range(n_segments):
-        start_idx = i * points_per_segment
-        if i == n_segments - 1:
-            end_idx = n_total
-        else:
-            end_idx = (i + 1) * points_per_segment + 1
+#     total_integral = 0
+#     for i in range(n_segments):
+#         start_idx = i * points_per_segment
+#         if i == n_segments - 1:
+#             end_idx = n_total
+#         else:
+#             end_idx = (i + 1) * points_per_segment + 1
         
-        segment = y[start_idx:end_idx]
+#         segment = y[start_idx:end_idx]
         
-        # Gunakan Simpson 1/3 untuk setiap segmen
-        if len(segment) > 2:
-            total_integral += manual_simpson_13(segment, h)
-        else:
-            total_integral += manual_trapezoidal(segment, h)
+#         # Gunakan Simpson 1/3 untuk setiap segmen
+#         if len(segment) > 2:
+#             total_integral += manual_simpson_13(segment, h)
+#         else:
+#             total_integral += manual_trapezoidal(segment, h)
     
-    return total_integral
+#     return total_integral
 
 # ========================================
-# 2. DIFERENSIASI NUMERIK (MANUAL)
+# 2. DIFERENSIASI NUMERIK 
 # ========================================
 
 def manual_diff_forward(y, h):
@@ -220,7 +220,7 @@ def manual_diff_second_order(y, h):
     return d2y
 
 # ========================================
-# 3. INTERPOLASI NEWTON (MANUAL)
+# 3. INTERPOLASI NEWTON 
 # ========================================
 
 def newton_divided_diff(x, y):
@@ -287,7 +287,7 @@ def lagrange_interpolation(x_data, y_data, x_target):
     return result
 
 # ========================================
-# 3B. CUBIC SPLINE INTERPOLATION (MANUAL)
+# 3B. CUBIC SPLINE INTERPOLATION 
 # ========================================
 
 def cubic_spline_coefficients(x, y):
@@ -393,7 +393,7 @@ def evaluate_cubic_spline(spline_coef, x_target):
         return results
 
 # ========================================
-# 4. REGRESI POLINOMIAL (MANUAL)
+# 4. REGRESI POLINOMIAL 
 # ========================================
 
 def manual_poly_regression(x, y, degree):

@@ -1,16 +1,12 @@
-# app.py
 import streamlit as st
 import pandas as pd
 import numpy as np
-import matplotlib.pyplot as plt
-import seaborn as sns
+import plotly.graph_objects as go
+import plotly.express as px
+from plotly.subplots import make_subplots
 from numerical_methods import *
 
 st.set_page_config(page_title="Analisis Energi Listrik", layout="wide")
-
-# Styling untuk plot
-plt.style.use('seaborn-v0_8-darkgrid')
-sns.set_palette("husl")
 
 # ========================================
 # DATA PREPROCESSING
@@ -68,9 +64,9 @@ if df_raw is not None:
     Dataset berisi pengukuran power consumption setiap menit selama beberapa tahun.
     
     **Metode Numerik yang Digunakan:**
-    1. Integrasi Numerik (Rectangular, Trapezoidal, Simpson 1/3, Simpson 3/8)
+    1. Integrasi Numerik (Trapezoidal, Simpson 1/3, Simpson 3/8, Richardson Extrapolation)
     2. Diferensiasi Numerik (Forward, Backward, Central Difference)
-    3. Interpolasi (Newton Divided Difference & Lagrange)
+    3. Interpolasi (Lagrange & Cubic Spline)
     4. Regresi Polinomial (Least Squares)
     
     **Sumber Data:** UCI Machine Learning Repository - Individual Household Electric Power Consumption
@@ -118,63 +114,74 @@ if df_raw is not None:
         # Sidebar untuk kontrol segmen
         st.subheader("Pengaturan Parameter Integrasi")
         
-        col1, col2 = st.columns([1, 1])
+        # col1, col2 = st.columns([1, 1])
+        # col1, col2 = st.columns([1, 1])
         
-        with col1:
-            n_segments = st.slider(
-                "Jumlah Segmen untuk Adaptive Integration",
-                min_value=1,
-                max_value=20,
-                value=5,
-                help="Membagi data menjadi beberapa segmen untuk integrasi yang lebih akurat"
-            )
+        # with col1:
+        #     n_segments = st.slider(
+        #         "Jumlah Segmen untuk Adaptive Integration",
+        #         min_value=1,
+        #         max_value=20,
+        #         value=5,
+        #         help="Membagi data menjadi beberapa segmen untuk integrasi yang lebih akurat"
+        #     )
         
-        with col2:
-            show_comparison = st.checkbox("Tampilkan Perbandingan dengan NumPy", value=True)
+        # with col1:
+        show_comparison = st.checkbox("Tampilkan Perbandingan dengan NumPy", value=True)
         
         st.markdown("---")
         
         # Hitung integral dengan berbagai metode
-        val_rect_left = manual_rectangular(power, h, method='left')
-        val_rect_right = manual_rectangular(power, h, method='right')
-        val_rect_mid = manual_rectangular(power, h, method='midpoint')
+        # val_rect_left = manual_rectangular(power, h, method='left')
+        # val_rect_right = manual_rectangular(power, h, method='right')
+        # val_rect_mid = manual_rectangular(power, h, method='midpoint')
         val_trap = manual_trapezoidal(power, h)
         val_simp13 = manual_simpson_13(power, h)
         val_simp38 = manual_simpson_38(power, h)
-        val_adaptive = adaptive_integration(power, h, n_segments)
+        # val_adaptive = adaptive_integration(power, h, n_segments)
         
-        # Nilai referensi menggunakan Simpson 1/3 dengan step size lebih kecil (jika ada data menit)
-        # Atau gunakan NumPy sebagai "ground truth"
+        # Nilai referensi
         val_numpy = np.trapz(power, dx=h)
         
-        # Richardson Extrapolation untuk meningkatkan akurasi
-        power_half = df_raw.set_index('datetime').resample('30min').mean(numeric_only=True)['Global_active_power'].values
+        # Richardson Extrapolation
+        # Resample dari df_raw untuk konsistensi
+        df_hourly_check = df_raw.set_index('datetime').resample('H').mean(numeric_only=True)
+        df_halfhour = df_raw.set_index('datetime').resample('30min').mean(numeric_only=True)
+
+        power_h = df_hourly_check['Global_active_power'].values
+        power_h2 = df_halfhour['Global_active_power'].values
+
+        h = 1.0
         h_half = 0.5
-        val_trap_half = manual_trapezoidal(power_half, h_half)
-        val_richardson = richardson_extrapolation(val_trap, val_trap_half, 2)
+
+        val_trap_h = manual_trapezoidal(power_h, h)
+        val_trap_h2 = manual_trapezoidal(power_h2, h_half)
+
+        val_richardson = richardson_extrapolation(val_trap_h, val_trap_h2, 2)
         
-        # Gunakan nilai referensi sebagai "exact value"
-        # Untuk real-world data, kita gunakan metode higher-order sebagai referensi
         exact_val = val_richardson
         
         # Display hasil
         st.subheader("Hasil Perhitungan Integral")
         
-        col1, col2, col3, col4 = st.columns(4)
+        # col1, col2, col3, col4 = st.columns(4)
+        col1, col2 = st.columns(2)
+        # with col1:
+            # st.metric("Rectangular (Left)", f"{val_rect_left:.2f} kWh")
+            # st.metric("Rectangular (Right)", f"{val_rect_right:.2f} kWh")
         with col1:
-            st.metric("Rectangular (Left)", f"{val_rect_left:.2f} kWh")
-            st.metric("Rectangular (Right)", f"{val_rect_right:.2f} kWh")
-        with col2:
-            st.metric("Rectangular (Mid)", f"{val_rect_mid:.2f} kWh")
+            # st.metric("Rectangular (Mid)", f"{val_rect_mid:.2f} kWh")
             st.metric("Trapezoidal", f"{val_trap:.2f} kWh")
-        with col3:
             st.metric("Simpson 1/3", f"{val_simp13:.2f} kWh")
+        with col2:
             if val_simp38:
                 st.metric("Simpson 3/8", f"{val_simp38:.2f} kWh")
-        with col4:
-            st.metric("Adaptive (Segmented)", f"{val_adaptive:.2f} kWh")
             st.metric("Richardson Extrap.", f"{val_richardson:.2f} kWh", 
                      help="Menggunakan Richardson Extrapolation untuk akurasi lebih tinggi")
+        # with col3:
+            
+            # st.metric("Adaptive (Segmented)", f"{val_adaptive:.2f} kWh")
+            
         
         if show_comparison:
             st.info(f"NumPy Reference (np.trapz): {val_numpy:.2f} kWh")
@@ -182,10 +189,14 @@ if df_raw is not None:
         # Analisis Error
         st.subheader("Analisis Error (Menggunakan Richardson Extrapolation sebagai Referensi)")
         
-        methods = ['Rect (Left)', 'Rect (Right)', 'Rect (Mid)', 'Trapezoidal', 
-                   'Simpson 1/3', 'Adaptive', 'NumPy']
-        values = [val_rect_left, val_rect_right, val_rect_mid, val_trap, 
-                  val_simp13, val_adaptive, val_numpy]
+        # methods = ['Rect (Left)', 'Rect (Right)', 'Rect (Mid)', 'Trapezoidal', 
+        #            'Simpson 1/3', 'Adaptive', 'NumPy']
+        methods = ['Trapezoidal', 
+                   'Simpson 1/3', 'NumPy']
+        # values = [val_rect_left, val_rect_right, val_rect_mid, val_trap, 
+        #           val_simp13, val_adaptive, val_numpy]
+        values = [val_trap, 
+                  val_simp13, val_numpy]
         
         if val_simp38:
             methods.insert(-1, 'Simpson 3/8')
@@ -203,34 +214,42 @@ if df_raw is not None:
         
         st.dataframe(df_error, use_container_width=True)
         
-        # Visualisasi error
-        fig, (ax1, ax2) = plt.subplots(1, 2, figsize=(14, 5))
+        # Visualisasi error dengan Plotly
+        fig = make_subplots(
+            rows=1, cols=2,
+            subplot_titles=('Absolute Error Comparison', 'Relative Error Comparison')
+        )
         
         # Absolute Error
-        ax1.bar(methods, errors_abs, color='steelblue', alpha=0.7)
-        ax1.set_ylabel('Absolute Error (kWh)')
-        ax1.set_title('Absolute Error Comparison')
-        ax1.tick_params(axis='x', rotation=45)
-        ax1.grid(axis='y', alpha=0.3)
+        fig.add_trace(
+            go.Bar(x=methods, y=errors_abs, name='Absolute Error',
+                   marker_color='steelblue', opacity=0.7,
+                   hovertemplate='<b>%{x}</b><br>Error: %{y:.4f} kWh<extra></extra>'),
+            row=1, col=1
+        )
         
         # Relative Error
-        ax2.bar(methods, errors_rel, color='coral', alpha=0.7)
-        ax2.set_ylabel('Relative Error (%)')
-        ax2.set_title('Relative Error Comparison')
-        ax2.tick_params(axis='x', rotation=45)
-        ax2.grid(axis='y', alpha=0.3)
+        fig.add_trace(
+            go.Bar(x=methods, y=errors_rel, name='Relative Error',
+                   marker_color='coral', opacity=0.7,
+                   hovertemplate='<b>%{x}</b><br>Error: %{y:.4f}%<extra></extra>'),
+            row=1, col=2
+        )
         
-        plt.tight_layout()
-        st.pyplot(fig)
+        fig.update_xaxes(tickangle=45)
+        fig.update_yaxes(title_text="Absolute Error (kWh)", row=1, col=1)
+        fig.update_yaxes(title_text="Relative Error (%)", row=1, col=2)
+        fig.update_layout(height=500, showlegend=False)
+        
+        st.plotly_chart(fig, use_container_width=True)
         
         # Pembahasan
         st.subheader("Pembahasan")
         st.markdown(f"""
         **Observasi:**
         - Metode Simpson 1/3 memberikan error terendah ({errors_rel[methods.index('Simpson 1/3')]:.4f}%)
-        - Metode Rectangular memiliki error tertinggi karena aproksimasi paling sederhana
+        - Metode Trapezoidal memiliki error lebih tinggi dari Simpson karena aproksimasi linear
         - Richardson Extrapolation berhasil meningkatkan akurasi dengan menggabungkan hasil dari dua step size berbeda
-        - Adaptive integration dengan {n_segments} segmen memberikan hasil: {val_adaptive:.4f} kWh
         
         **Kesimpulan:**
         Untuk integrasi data power consumption, metode Simpson 1/3 atau Richardson Extrapolation
@@ -260,43 +279,61 @@ if df_raw is not None:
         # Threshold untuk deteksi anomali
         threshold = st.slider("Threshold Anomali (kW/h)", 0.5, 5.0, 2.0, 0.1)
         
-        # Visualisasi
+        # Visualisasi dengan Plotly
         st.subheader("Laju Perubahan Power Consumption")
         
-        fig, axes = plt.subplots(2, 2, figsize=(15, 10))
+        fig = make_subplots(
+            rows=2, cols=2,
+            subplot_titles=('Original Power Consumption', 'Forward Difference',
+                          'Central Difference (Most Accurate)', 'Second Order Derivative (Acceleration)')
+        )
         
         # Plot 1: Power original
-        axes[0, 0].plot(df_hourly['datetime'], power, color='blue', alpha=0.7, linewidth=1)
-        axes[0, 0].set_ylabel('Power (kW)')
-        axes[0, 0].set_title('Original Power Consumption')
-        axes[0, 0].grid(True, alpha=0.3)
+        fig.add_trace(
+            go.Scatter(x=df_hourly['datetime'], y=power, mode='lines',
+                      name='Power', line=dict(color='blue', width=1),
+                      hovertemplate='<b>Time:</b> %{x}<br><b>Power:</b> %{y:.2f} kW<extra></extra>'),
+            row=1, col=1
+        )
         
         # Plot 2: Forward Difference
-        axes[0, 1].plot(df_hourly['datetime'], dpdt_forward, color='green', alpha=0.7, linewidth=1)
-        axes[0, 1].axhline(threshold, color='red', linestyle='--', label=f'Threshold = {threshold}')
-        axes[0, 1].axhline(-threshold, color='red', linestyle='--')
-        axes[0, 1].set_ylabel('dP/dt (kW/h)')
-        axes[0, 1].set_title('Forward Difference')
-        axes[0, 1].legend()
-        axes[0, 1].grid(True, alpha=0.3)
+        fig.add_trace(
+            go.Scatter(x=df_hourly['datetime'], y=dpdt_forward, mode='lines',
+                      name='Forward', line=dict(color='green', width=1),
+                      hovertemplate='<b>Time:</b> %{x}<br><b>dP/dt:</b> %{y:.2f} kW/h<extra></extra>'),
+            row=1, col=2
+        )
+        fig.add_hline(y=threshold, line_dash="dash", line_color="red", row=1, col=2,
+                     annotation_text=f"Threshold = {threshold}")
+        fig.add_hline(y=-threshold, line_dash="dash", line_color="red", row=1, col=2)
         
         # Plot 3: Central Difference
-        axes[1, 0].plot(df_hourly['datetime'], dpdt_central, color='orange', alpha=0.7, linewidth=1)
-        axes[1, 0].axhline(threshold, color='red', linestyle='--', label=f'Threshold = {threshold}')
-        axes[1, 0].axhline(-threshold, color='red', linestyle='--')
-        axes[1, 0].set_ylabel('dP/dt (kW/h)')
-        axes[1, 0].set_title('Central Difference (Most Accurate)')
-        axes[1, 0].legend()
-        axes[1, 0].grid(True, alpha=0.3)
+        fig.add_trace(
+            go.Scatter(x=df_hourly['datetime'], y=dpdt_central, mode='lines',
+                      name='Central', line=dict(color='orange', width=1),
+                      hovertemplate='<b>Time:</b> %{x}<br><b>dP/dt:</b> %{y:.2f} kW/h<extra></extra>'),
+            row=2, col=1
+        )
+        fig.add_hline(y=threshold, line_dash="dash", line_color="red", row=2, col=1,
+                     annotation_text=f"Threshold = {threshold}")
+        fig.add_hline(y=-threshold, line_dash="dash", line_color="red", row=2, col=1)
         
         # Plot 4: Second Order Derivative
-        axes[1, 1].plot(df_hourly['datetime'], dpdt_second, color='purple', alpha=0.7, linewidth=1)
-        axes[1, 1].set_ylabel('d²P/dt² (kW/h²)')
-        axes[1, 1].set_title('Second Order Derivative (Acceleration)')
-        axes[1, 1].grid(True, alpha=0.3)
+        fig.add_trace(
+            go.Scatter(x=df_hourly['datetime'], y=dpdt_second, mode='lines',
+                      name='Second Order', line=dict(color='purple', width=1),
+                      hovertemplate='<b>Time:</b> %{x}<br><b>d²P/dt²:</b> %{y:.2f} kW/h²<extra></extra>'),
+            row=2, col=2
+        )
         
-        plt.tight_layout()
-        st.pyplot(fig)
+        fig.update_yaxes(title_text="Power (kW)", row=1, col=1)
+        fig.update_yaxes(title_text="dP/dt (kW/h)", row=1, col=2)
+        fig.update_yaxes(title_text="dP/dt (kW/h)", row=2, col=1)
+        fig.update_yaxes(title_text="d²P/dt² (kW/h²)", row=2, col=2)
+        
+        fig.update_layout(height=800, showlegend=False)
+        
+        st.plotly_chart(fig, use_container_width=True)
         
         # Deteksi anomali
         anomali_indices = np.where(np.abs(dpdt_central) > threshold)[0]
@@ -323,7 +360,7 @@ if df_raw is not None:
                 st.metric("Max |dP/dt|", f"{anomali_data['Magnitude'].max():.2f} kW/h")
                 st.metric("% dari Total Data", f"{len(anomali_data)/len(df_hourly)*100:.2f}%")
         
-        # Analisis Error - Bandingkan dengan NumPy gradient
+        # Analisis Error
         st.subheader("Analisis Error Diferensiasi")
         
         # NumPy gradient sebagai referensi
@@ -372,8 +409,8 @@ if df_raw is not None:
         interpolasi polinomial.
         
         **Metode:**
-        - Newton Divided Difference
         - Lagrange Interpolation
+        - Cubic Spline
         """)
         
         # Parameter simulasi missing data
@@ -387,73 +424,111 @@ if df_raw is not None:
         
         # Simulasi data hilang
         idx_missing = list(range(start_missing, start_missing + n_missing))
-        window_size = 50  # Menggunakan window untuk interpolasi
         
-        x_full = np.arange(window_size)
-        y_full = power[:window_size].copy()
+        # Sesuaikan window_size dengan slider maximum
+        window_size = 150  # Atau buat dynamic
+        x_full = np.arange(min(window_size, len(power)))
+        y_full = power[:len(x_full)].copy()
         
         # Hapus data pada indeks missing
         x_sample = np.delete(x_full, [i for i in idx_missing if i < window_size])
         y_sample = np.delete(y_full, [i for i in idx_missing if i < window_size])
         
-        # Interpolasi menggunakan Newton
-        coef_newton = newton_divided_diff(x_sample, y_sample)
+        # Interpolasi
         
         # Evaluasi interpolasi
         x_interp = np.linspace(0, window_size-1, 200)
-        y_newton = [evaluate_newton(x_sample, coef_newton, xi) for xi in x_interp]
         y_lagrange = [lagrange_interpolation(x_sample, y_sample, xi) for xi in x_interp]
+        
+        # Cubic spline
+        spline_coef = cubic_spline_coefficients(x_sample, y_sample)
+        y_spline = evaluate_cubic_spline(spline_coef, x_interp)
         
         # Recovery data yang hilang
         x_missing_actual = [i for i in idx_missing if i < window_size]
         y_missing_true = [y_full[i] for i in x_missing_actual]
-        y_missing_newton = [evaluate_newton(x_sample, coef_newton, xi) for xi in x_missing_actual]
         y_missing_lagrange = [lagrange_interpolation(x_sample, y_sample, xi) for xi in x_missing_actual]
+        y_missing_spline = evaluate_cubic_spline(spline_coef, np.array(x_missing_actual))
         
-        # Visualisasi
+        # Visualisasi dengan Plotly
         st.subheader("Hasil Interpolasi")
         
-        fig, axes = plt.subplots(1, 2, figsize=(15, 5))
-        
-        # Plot Newton
-        axes[0].scatter(x_sample, y_sample, color='blue', s=50, label='Data Tersedia', zorder=3)
-        axes[0].scatter(x_missing_actual, y_missing_true, color='red', s=50, 
-                       label='Data Hilang (Truth)', zorder=4, marker='x')
-        axes[0].plot(x_interp, y_newton, 'g--', linewidth=2, label='Newton Interpolation', zorder=2)
-        axes[0].scatter(x_missing_actual, y_missing_newton, color='orange', s=100, 
-                       label='Prediksi Newton', zorder=5, marker='^', edgecolors='black')
-        axes[0].set_xlabel('Time Index')
-        axes[0].set_ylabel('Power (kW)')
-        axes[0].set_title('Newton Divided Difference Interpolation')
-        axes[0].legend()
-        axes[0].grid(True, alpha=0.3)
+        fig = make_subplots(
+            rows=1, cols=2,
+            subplot_titles=('Lagrange Interpolation', 
+                          'Cubic Spline (No Oscillation!)')
+        )
         
         # Plot Lagrange
-        axes[1].scatter(x_sample, y_sample, color='blue', s=50, label='Data Tersedia', zorder=3)
-        axes[1].scatter(x_missing_actual, y_missing_true, color='red', s=50, 
-                       label='Data Hilang (Truth)', zorder=4, marker='x')
-        axes[1].plot(x_interp, y_lagrange, 'm--', linewidth=2, label='Lagrange Interpolation', zorder=2)
-        axes[1].scatter(x_missing_actual, y_missing_lagrange, color='cyan', s=100, 
-                       label='Prediksi Lagrange', zorder=5, marker='^', edgecolors='black')
-        axes[1].set_xlabel('Time Index')
-        axes[1].set_ylabel('Power (kW)')
-        axes[1].set_title('Lagrange Interpolation')
-        axes[1].legend()
-        axes[1].grid(True, alpha=0.3)
+        fig.add_trace(
+            go.Scatter(x=x_sample, y=y_sample, mode='markers',
+                      marker=dict(size=8, color='blue'), showlegend=False,
+                      hovertemplate='<b>Index:</b> %{x}<br><b>Power:</b> %{y:.2f} kW<extra></extra>'),
+            row=1, col=1
+        )
+        fig.add_trace(
+            go.Scatter(x=x_missing_actual, y=y_missing_true, mode='markers',
+                      marker=dict(size=10, color='red', symbol='x'), showlegend=False,
+                      hovertemplate='<b>Index:</b> %{x}<br><b>True:</b> %{y:.2f} kW<extra></extra>'),
+            row=1, col=1
+        )
+        fig.add_trace(
+            go.Scatter(x=x_interp, y=y_lagrange, mode='lines',
+                      line=dict(color='magenta', dash='dash', width=2), showlegend=False,
+                      hovertemplate='<b>Index:</b> %{x:.1f}<br><b>Power:</b> %{y:.2f} kW<extra></extra>'),
+            row=1, col=1
+        )
+        fig.add_trace(
+            go.Scatter(x=x_missing_actual, y=y_missing_lagrange, mode='markers',
+                      marker=dict(size=12, color='cyan', symbol='triangle-up',
+                      line=dict(width=2, color='black')), showlegend=False,
+                      hovertemplate='<b>Index:</b> %{x}<br><b>Pred:</b> %{y:.2f} kW<extra></extra>'),
+            row=1, col=1
+        )
         
-        plt.tight_layout()
-        st.pyplot(fig)
+        # Plot Cubic Spline
+        fig.add_trace(
+            go.Scatter(x=x_sample, y=y_sample, mode='markers',
+                      marker=dict(size=8, color='blue'), showlegend=False,
+                      hovertemplate='<b>Index:</b> %{x}<br><b>Power:</b> %{y:.2f} kW<extra></extra>'),
+            row=1, col=2
+        )
+        fig.add_trace(
+            go.Scatter(x=x_missing_actual, y=y_missing_true, mode='markers',
+                      marker=dict(size=10, color='red', symbol='x'), showlegend=False,
+                      hovertemplate='<b>Index:</b> %{x}<br><b>True:</b> %{y:.2f} kW<extra></extra>'),
+            row=1, col=2
+        )
+        fig.add_trace(
+            go.Scatter(x=x_interp, y=y_spline, mode='lines',
+                      line=dict(color='purple', width=2), showlegend=False,
+                      hovertemplate='<b>Index:</b> %{x:.1f}<br><b>Power:</b> %{y:.2f} kW<extra></extra>'),
+            row=1, col=2
+        )
+        fig.add_trace(
+            go.Scatter(x=x_missing_actual, y=y_missing_spline, mode='markers',
+                      marker=dict(size=12, color='yellow', symbol='triangle-up',
+                      line=dict(width=2, color='black')), showlegend=False,
+                      hovertemplate='<b>Index:</b> %{x}<br><b>Pred:</b> %{y:.2f} kW<extra></extra>'),
+            row=1, col=2
+        )
+        
+        fig.update_xaxes(title_text="Time Index (Hours)")
+        fig.update_yaxes(title_text="Power (kW)")
+        fig.update_layout(height=500)
+        
+        st.plotly_chart(fig, use_container_width=True)
         
         # Analisis Error
         st.subheader("Analisis Error Interpolasi")
         
         if len(y_missing_true) > 0:
-            errors_newton = calculate_errors(y_missing_true, y_missing_newton)
             errors_lagrange = calculate_errors(y_missing_true, y_missing_lagrange)
+            errors_spline = calculate_errors(y_missing_true, y_missing_spline)
             
             df_interp_error = pd.DataFrame({
-                'Newton': errors_newton,
-                'Lagrange': errors_lagrange
+                'Lagrange': errors_lagrange,
+                'Cubic Spline': errors_spline
             }).T
             
             st.dataframe(df_interp_error, use_container_width=True)
@@ -464,68 +539,97 @@ if df_raw is not None:
             df_missing_comparison = pd.DataFrame({
                 'Index': x_missing_actual,
                 'True Value': y_missing_true,
-                'Newton Pred': y_missing_newton,
                 'Lagrange Pred': y_missing_lagrange,
-                'Newton Error': np.abs(np.array(y_missing_true) - np.array(y_missing_newton)),
-                'Lagrange Error': np.abs(np.array(y_missing_true) - np.array(y_missing_lagrange))
+                'Spline Pred': y_missing_spline,
+                'Lagrange Error': np.abs(np.array(y_missing_true) - np.array(y_missing_lagrange)),
+                'Spline Error': np.abs(np.array(y_missing_true) - np.array(y_missing_spline))
             })
             
             st.dataframe(df_missing_comparison, use_container_width=True)
             
-            # Visualisasi error per titik
-            fig, ax = plt.subplots(figsize=(12, 5))
+            # Visualisasi error per titik dengan Plotly
+            fig = go.Figure()
+            
             x_pos = np.arange(len(x_missing_actual))
             width = 0.35
             
-            ax.bar(x_pos - width/2, df_missing_comparison['Newton Error'], width, 
-                   label='Newton Error', color='green', alpha=0.7)
-            ax.bar(x_pos + width/2, df_missing_comparison['Lagrange Error'], width, 
-                   label='Lagrange Error', color='magenta', alpha=0.7)
             
-            ax.set_xlabel('Missing Data Point')
-            ax.set_ylabel('Absolute Error (kW)')
-            ax.set_title('Error Comparison per Missing Point')
-            ax.set_xticks(x_pos)
-            ax.set_xticklabels(x_missing_actual)
-            ax.legend()
-            ax.grid(axis='y', alpha=0.3)
+            fig.add_trace(go.Bar(
+                x=x_pos,
+                y=df_missing_comparison['Lagrange Error'],
+                name='Lagrange Error',
+                marker_color='magenta',
+                opacity=0.7,
+                hovertemplate='<b>Point:</b> %{x}<br><b>Error:</b> %{y:.4f} kW<extra></extra>'
+            ))
             
-            st.pyplot(fig)
+            fig.add_trace(go.Bar(
+                x=x_pos + width,
+                y=df_missing_comparison['Spline Error'],
+                name='Cubic Spline Error',
+                marker_color='purple',
+                opacity=0.7,
+                hovertemplate='<b>Point:</b> %{x}<br><b>Error:</b> %{y:.4f} kW<extra></extra>'
+            ))
+            
+            fig.update_layout(
+                xaxis=dict(
+                    tickmode='array',
+                    tickvals=x_pos,
+                    ticktext=x_missing_actual,
+                    title='Missing Data Point'
+                ),
+                yaxis_title='Absolute Error (kW)',
+                title='Error Comparison per Missing Point',
+                barmode='group',
+                height=500
+            )
+            
+            st.plotly_chart(fig, use_container_width=True)
         
         # Pembahasan
         st.subheader("Pembahasan")
         if len(y_missing_true) > 0:
+            best_method = min(
+                [('Lagrange', errors_lagrange['MAE']),
+                ('Cubic Spline', errors_spline['MAE'])],
+                key=lambda x: x[1]
+            )
             observasi_text = f"""
         **Observasi:**
-        - MAE Newton: {errors_newton['MAE']:.4f} kW
         - MAE Lagrange: {errors_lagrange['MAE']:.4f} kW
-        - Kedua metode memberikan hasil yang sangat mirip (secara teoritis identik)
+        - MAE Cubic Spline: {errors_spline['MAE']:.4f} kW
         
-        **Karakteristik Interpolasi Polinomial:**
-        - Sempurna untuk data yang smooth dan kontinu
-        - Dapat terjadi Runge's phenomenon pada polinomial berderajat tinggi
-        - Baik untuk recovery data yang hilang dalam jumlah kecil
-        
+        **Perbandingan Metode:**
+        1. **Cubic Spline Advantages:**
+        - Menghindari Runge's Phenomenon (tidak oscillate)
+        - Smooth interpolation (C² continuity)
+        - Error rata-rata: {errors_spline['MAE']:.4f} kW
+        - Lebih stable untuk banyak data points
+        - Natural boundary conditions
+
+        2. **Kapan Gunakan Cubic Spline?**
+        - Data dengan banyak titik (>10 points)
+        - Membutuhkan smoothness (aplikasi fisika)
+        - Interpolasi jangka panjang
+        - Menghindari oscillation artifacts
+
+        **Metode Terbaik:** {best_method[0]} dengan MAE = {best_method[1]:.4f} kW
+
         **Kesimpulan:**
-        Interpolasi Newton dan Lagrange efektif untuk recovery data hilang dengan error rata-rata
-        {errors_newton['MAE']:.4f} kW. Untuk data yang lebih kompleks, pertimbangkan spline interpolation.
+        Cubic Spline memberikan hasil terbaik dengan error rata-rata {errors_spline['MAE']:.4f} kW.
+        Untuk recovery data yang hilang, Cubic Spline adalah pilihan optimal karena:
+        - Menghindari polynomial oscillation
+        - Memberikan curve yang lebih natural dan smooth
+        - Lebih robust terhadap noise
         """
         else:
             observasi_text = """
-        **Observasi:**
-        - Tidak ada data yang hilang dalam window yang dipilih
-        - Silakan sesuaikan parameter untuk simulasi missing data
-        
-        **Karakteristik Interpolasi Polinomial:**
-        - Sempurna untuk data yang smooth dan kontinu
-        - Dapat terjadi Runge's phenomenon pada polinomial berderajat tinggi
-        - Baik untuk recovery data yang hilang dalam jumlah kecil
-        
-        **Kesimpulan:**
-        Interpolasi Newton dan Lagrange secara teoritis memberikan hasil identik untuk 
-        interpolasi polinomial. Sesuaikan parameter untuk melihat hasil recovery data.
-        """
-        
+            **Observasi:**
+            - Tidak ada data yang hilang dalam window yang dipilih
+            - Silakan sesuaikan parameter untuk simulasi missing data
+            """
+       
         st.markdown(observasi_text)
     
     # ========================================
@@ -565,37 +669,73 @@ if df_raw is not None:
         y_train_pred = evaluate_polynomial(coeffs, x_train)
         y_test_pred = evaluate_polynomial(coeffs, x_test)
         
-        # Visualisasi
+        # Visualisasi dengan Plotly
         st.subheader("Hasil Regresi")
         
-        fig, axes = plt.subplots(2, 1, figsize=(15, 10))
+        fig = make_subplots(
+            rows=2, cols=1,
+            subplot_titles=(f'Polynomial Regression (Degree {deg})', 'Residual Plot'),
+            vertical_spacing=0.12
+        )
         
         # Plot keseluruhan
-        axes[0].plot(np.arange(len(power)), power, alpha=0.5, label='Data Asli', color='blue', linewidth=1)
-        axes[0].plot(x_train, y_train_pred, color='red', label=f'Regresi Training (Degree {deg})', linewidth=2)
-        axes[0].plot(x_test, y_test_pred, color='green', label='Prediksi Testing', linewidth=2, linestyle='--')
-        axes[0].axvline(split_idx, color='black', linestyle=':', label='Train/Test Split')
-        axes[0].set_xlabel('Time (hours)')
-        axes[0].set_ylabel('Power (kW)')
-        axes[0].set_title(f'Polynomial Regression (Degree {deg})')
-        axes[0].legend()
-        axes[0].grid(True, alpha=0.3)
+        fig.add_trace(
+            go.Scatter(x=np.arange(len(power)), y=power, mode='lines',
+                      name='Data Asli', line=dict(color='blue', width=1),
+                      opacity=0.5,
+                      hovertemplate='<b>Time:</b> %{x}h<br><b>Power:</b> %{y:.2f} kW<extra></extra>'),
+            row=1, col=1
+        )
+        
+        fig.add_trace(
+            go.Scatter(x=x_train, y=y_train_pred, mode='lines',
+                      name=f'Regresi Training (Degree {deg})',
+                      line=dict(color='red', width=2),
+                      hovertemplate='<b>Time:</b> %{x}h<br><b>Pred:</b> %{y:.2f} kW<extra></extra>'),
+            row=1, col=1
+        )
+        
+        fig.add_trace(
+            go.Scatter(x=x_test, y=y_test_pred, mode='lines',
+                      name='Prediksi Testing',
+                      line=dict(color='green', width=2, dash='dash'),
+                      hovertemplate='<b>Time:</b> %{x}h<br><b>Pred:</b> %{y:.2f} kW<extra></extra>'),
+            row=1, col=1
+        )
+        
+        fig.add_vline(x=split_idx, line_dash="dot", line_color="black",
+                     annotation_text="Train/Test Split", row=1, col=1)
         
         # Plot residual
         residual_train = y_train - y_train_pred
         residual_test = y_test - y_test_pred
         
-        axes[1].scatter(x_train, residual_train, alpha=0.5, s=10, label='Residual Training', color='blue')
-        axes[1].scatter(x_test, residual_test, alpha=0.5, s=10, label='Residual Testing', color='green')
-        axes[1].axhline(0, color='red', linestyle='--', linewidth=2)
-        axes[1].set_xlabel('Time (hours)')
-        axes[1].set_ylabel('Residual (kW)')
-        axes[1].set_title('Residual Plot')
-        axes[1].legend()
-        axes[1].grid(True, alpha=0.3)
+        fig.add_trace(
+            go.Scatter(x=x_train, y=residual_train, mode='markers',
+                      name='Residual Training',
+                      marker=dict(size=4, color='blue', opacity=0.5),
+                      hovertemplate='<b>Time:</b> %{x}h<br><b>Residual:</b> %{y:.2f} kW<extra></extra>'),
+            row=2, col=1
+        )
         
-        plt.tight_layout()
-        st.pyplot(fig)
+        fig.add_trace(
+            go.Scatter(x=x_test, y=residual_test, mode='markers',
+                      name='Residual Testing',
+                      marker=dict(size=4, color='green', opacity=0.5),
+                      hovertemplate='<b>Time:</b> %{x}h<br><b>Residual:</b> %{y:.2f} kW<extra></extra>'),
+            row=2, col=1
+        )
+        
+        fig.add_hline(y=0, line_dash="dash", line_color="red", line_width=2, row=2, col=1)
+        
+        fig.update_xaxes(title_text="Waktu (Jam ke-n dalam 1 Minggu)", row=1, col=1)
+        fig.update_xaxes(title_text="Waktu (Jam ke-n dalam 1 Minggu)", row=2, col=1)
+        
+        fig.update_yaxes(title_text="Power (kW)", row=1, col=1)
+        fig.update_yaxes(title_text="Residual (kW)", row=2, col=1)
+        fig.update_layout(height=900)
+        
+        st.plotly_chart(fig, use_container_width=True)
         
         # Analisis Error
         st.subheader("Analisis Error Regresi")
@@ -650,51 +790,77 @@ if df_raw is not None:
         df_comparison = pd.DataFrame(comparison_results)
         st.dataframe(df_comparison, use_container_width=True)
         
-        # Visualisasi perbandingan
-        fig, axes = plt.subplots(1, 2, figsize=(14, 5))
+        # Visualisasi perbandingan dengan Plotly
+        fig = make_subplots(
+            rows=1, cols=2,
+            subplot_titles=('R² vs Polynomial Degree', 'Error vs Polynomial Degree')
+        )
         
-        axes[0].plot(df_comparison['Degree'], df_comparison['R²'], marker='o', linewidth=2)
-        axes[0].set_xlabel('Polynomial Degree')
-        axes[0].set_ylabel('R² Score')
-        axes[0].set_title('R² vs Polynomial Degree')
-        axes[0].grid(True, alpha=0.3)
+        # R² plot
+        fig.add_trace(
+            go.Scatter(x=df_comparison['Degree'], y=df_comparison['R²'],
+                      mode='lines+markers', name='R²',
+                      line=dict(width=2), marker=dict(size=10),
+                      hovertemplate='<b>Degree:</b> %{x}<br><b>R²:</b> %{y:.4f}<extra></extra>'),
+            row=1, col=1
+        )
         
-        axes[1].plot(df_comparison['Degree'], df_comparison['RMSE'], marker='o', linewidth=2, label='RMSE')
-        axes[1].plot(df_comparison['Degree'], df_comparison['MAE'], marker='s', linewidth=2, label='MAE')
-        axes[1].set_xlabel('Polynomial Degree')
-        axes[1].set_ylabel('Error')
-        axes[1].set_title('Error vs Polynomial Degree')
-        axes[1].legend()
-        axes[1].grid(True, alpha=0.3)
+        # Error plot
+        fig.add_trace(
+            go.Scatter(x=df_comparison['Degree'], y=df_comparison['RMSE'],
+                      mode='lines+markers', name='RMSE',
+                      line=dict(width=2), marker=dict(size=10),
+                      hovertemplate='<b>Degree:</b> %{x}<br><b>RMSE:</b> %{y:.4f}<extra></extra>'),
+            row=1, col=2
+        )
         
-        plt.tight_layout()
-        st.pyplot(fig)
+        fig.add_trace(
+            go.Scatter(x=df_comparison['Degree'], y=df_comparison['MAE'],
+                      mode='lines+markers', name='MAE',
+                      line=dict(width=2), marker=dict(size=10, symbol='square'),
+                      hovertemplate='<b>Degree:</b> %{x}<br><b>MAE:</b> %{y:.4f}<extra></extra>'),
+            row=1, col=2
+        )
+        
+        fig.update_xaxes(title_text="Polynomial Degree")
+        fig.update_yaxes(title_text="R² Score", row=1, col=1)
+        fig.update_yaxes(title_text="Error", row=1, col=2)
+        fig.update_layout(height=500)
+        
+        st.plotly_chart(fig, use_container_width=True)
         
         # Pembahasan
         st.subheader("Pembahasan")
         
         best_degree = df_comparison.loc[df_comparison['R²'].idxmax(), 'Degree']
         
+        r2_warning = ""
+        if errors_test['R2'] < 0:
+            r2_warning = f"""> **Catatan Analisis:** Nilai $R^2$ yang negatif ({errors_test['R2']:.4f}) pada data testing menunjukkan bahwa model polinomial derajat {deg} tidak cocok (*poor fit*) untuk data ini. Hal ini mengindikasikan bahwa pola konsumsi listrik sangat fluktuatif sehingga fungsi polinomial sederhana tidak mampu menangkap kompleksitas perubahan data dalam jangka panjang."""
+
         st.markdown(f"""
         **Observasi:**
-        - Derajat optimal (berdasarkan R²): {int(best_degree)}
-        - R² Training: {errors_train['R2']:.4f}
-        - R² Testing: {errors_test['R2']:.4f}
-        - RMSE Testing: {errors_test['RMSE']:.4f} kW
+        - **Konteks Data**: Data mencakup durasi **168 jam (1 minggu)**. Satuan jam ini krusial karena penggunaan listrik memiliki siklus harian (24 jam).
+        - **Derajat optimal** (berdasarkan $R^2$): {int(best_degree)} 
+        - **$R^2$ Training**: {errors_train['R2']:.4f} 
+        - **$R^2$ Testing**: {errors_test['R2']:.4f} 
+        - **RMSE Testing**: {errors_test['RMSE']:.4f} kW 
         
         **Trade-off Bias-Variance:**
-        - Derajat rendah: Underfitting (bias tinggi)
-        - Derajat tinggi: Overfitting (variance tinggi)
-        - Derajat optimal menyeimbangkan keduanya
+        - **Derajat rendah**: Underfitting (bias tinggi) 
+        - **Derajat tinggi**: Overfitting (variance tinggi) 
+        - **Derajat optimal** menyeimbangkan keduanya untuk mendapatkan error generalisasi terkecil. 
         
         **Interpretasi Koefisien:**
-        - Koefisien positif pada x^n: Tren naik
-        - Koefisien negatif: Tren turun
-        - Magnitude koefisien menunjukkan pengaruh terhadap prediksi
+        - Koefisien positif pada $x^n$: Menunjukkan tren kenaikan konsumsi energi seiring waktu. 
+        - Koefisien negatif: Menunjukkan tren penurunan konsumsi energi. 
+        - Magnitude koefisien menunjukkan seberapa besar pengaruh variabel waktu terhadap perubahan power. 
         
         **Kesimpulan:**
-        Regresi polinomial degree {deg} berhasil menangkap tren dengan R² = {errors_test['R2']:.4f}.
-        Residual plot menunjukkan distribusi error yang {"random" if abs(np.mean(residual_test)) < 0.1 else "masih memiliki pola"}.
+        Regresi polinomial derajat {deg} berusaha menangkap tren umum penggunaan energi[cite: 225]. Namun, karena durasi data mencapai 168 jam, model polinomial tunggal sering kali gagal mengikuti pola siklus harian yang tajam.
+        Juga bisa dilihat Residual plot menunjukkan distribusi error yang {"bersifat acak (random)" if abs(np.mean(residual_test)) < 0.1 else "masih memiliki pola tertentu"}.
+        
+        {r2_warning}
         """)
     
     # ========================================
@@ -714,16 +880,19 @@ if df_raw is not None:
         st.subheader("1. Integrasi Numerik - Total Energi")
         
         summary_integration = pd.DataFrame({
-            'Metode': ['Simpson 1/3', 'Trapezoidal', 'Richardson', 'Adaptive'],
-            'Hasil (kWh)': [val_simp13, val_trap, val_richardson, val_adaptive],
+            # 'Metode': ['Simpson 1/3', 'Trapezoidal', 'Richardson', 'Adaptive'],
+            'Metode': ['Simpson 1/3', 'Trapezoidal', 'Richardson'],
+            # 'Hasil (kWh)': [val_simp13, val_trap, val_richardson, val_adaptive],
+            'Hasil (kWh)': [val_simp13, val_trap, val_richardson],
             'Relative Error (%)': [
                 abs(val_simp13 - exact_val) / exact_val * 100,
                 abs(val_trap - exact_val) / exact_val * 100,
-                0.0,  # Richardson sebagai referensi
-                abs(val_adaptive - exact_val) / exact_val * 100
+                0.0,
+                # abs(val_adaptive - exact_val) / exact_val * 100
             ],
-            'Kompleksitas': ['O(n)', 'O(n)', 'O(2n)', 'O(n)'],
-            'Rekomendasi': ['Akurasi Tinggi', 'Balance', 'Referensi', 'Fleksibel']
+            # 'Kompleksitas': ['O(n)', 'O(n)', 'O(2n)', 'O(n)'],
+            'Kompleksitas': ['O(n)', 'O(n)', 'O(2n)'],
+            'Rekomendasi': ['Akurasi Tinggi', 'Balance', 'Referensi']
         })
         
         st.dataframe(summary_integration, use_container_width=True)
@@ -746,9 +915,9 @@ if df_raw is not None:
         
         st.subheader("3. Interpolasi - Data Recovery")
         
-        # Hitung ulang interpolasi untuk summary (karena variabel dari tab 3 tidak tersedia di sini)
+        # Hitung ulang interpolasi untuk summary
         missing_indices_summary = list(range(50, 56))
-        window_size_summary = 100  # Perbesar window agar missing indices pasti masuk
+        window_size_summary = 100
         
         x_full_summary = np.arange(min(window_size_summary, len(power)))
         y_full_summary = power[:len(x_full_summary)].copy()
@@ -761,34 +930,33 @@ if df_raw is not None:
             
             y_true_summary = [y_full_summary[i] for i in valid_missing_summary]
             
-            # Newton interpolation
-            coef_newton_summary = newton_divided_diff(x_sample_summary, y_sample_summary)
-            y_newton_summary = [evaluate_newton(x_sample_summary, coef_newton_summary, i) for i in valid_missing_summary]
-            
             # Lagrange interpolation
             y_lagrange_summary = [lagrange_interpolation(x_sample_summary, y_sample_summary, i) for i in valid_missing_summary]
             
-            # Hitung error
-            errors_newton_summary = calculate_errors(y_true_summary, y_newton_summary)
-            errors_lagrange_summary = calculate_errors(y_true_summary, y_lagrange_summary)
+            # Cubic Spline
+            spline_coef_summary = cubic_spline_coefficients(x_sample_summary, y_sample_summary)
+            y_spline_summary = evaluate_cubic_spline(spline_coef_summary, np.array(valid_missing_summary))
             
+            # Hitung error
+            errors_lagrange_summary = calculate_errors(y_true_summary, y_lagrange_summary)
+            errors_spline_summary = calculate_errors(y_true_summary, y_spline_summary) 
+    
             summary_interpolation = pd.DataFrame({
-                'Metode': ['Newton', 'Lagrange'],
-                'MAE (kW)': [errors_newton_summary['MAE'], errors_lagrange_summary['MAE']],
-                'RMSE (kW)': [errors_newton_summary['RMSE'], errors_lagrange_summary['RMSE']],
-                'MAPE (%)': [errors_newton_summary['MAPE'], errors_lagrange_summary['MAPE']],
-                'Komputasi': ['Efisien', 'Lebih Lambat'],
-                'Rekomendasi': ['Praktis', 'Teoritis']
+                'Metode': ['Lagrange', 'Cubic Spline'],
+                'MAE (kW)': [errors_lagrange_summary['MAE'], errors_spline_summary['MAE']],
+                'RMSE (kW)': [errors_lagrange_summary['RMSE'], errors_spline_summary['RMSE']],
+                'MAPE (%)': [errors_lagrange_summary['MAPE'], errors_spline_summary['MAPE']],
+                'Komputasi': ['Lebih Lambat', 'Moderate'],
+                'Rekomendasi': ['Teoritis', 'Terbaik']
             })
         else:
-            # Jika tidak ada data missing yang valid, buat tabel placeholder
             summary_interpolation = pd.DataFrame({
-                'Metode': ['Newton', 'Lagrange'],
+                'Metode': ['Lagrange', 'Cubic Spline'],
                 'MAE (kW)': ['N/A', 'N/A'],
                 'RMSE (kW)': ['N/A', 'N/A'],
                 'MAPE (%)': ['N/A', 'N/A'],
-                'Komputasi': ['Efisien', 'Lebih Lambat'],
-                'Rekomendasi': ['Praktis', 'Teoritis']
+                'Komputasi': ['Lebih Lambat', 'Moderate'],
+                'Rekomendasi': ['Teoritis', 'Terbaik']
             })
         
         st.dataframe(summary_interpolation, use_container_width=True)
@@ -806,24 +974,36 @@ if df_raw is not None:
         
         st.dataframe(summary_regression, use_container_width=True)
         
-        # Overall Comparison Chart
+        # Overall Comparison Chart dengan Plotly
         st.subheader("Visualisasi Perbandingan Overall")
         
-        fig, axes = plt.subplots(2, 2, figsize=(15, 12))
+        fig = make_subplots(
+            rows=2, cols=2,
+            subplot_titles=('Integrasi: Error Comparison', 
+                          'Diferensiasi: RMSE Comparison',
+                          'Interpolasi: Error Distribution', 
+                          'Regresi: R² vs Degree'),
+            specs=[[{"type": "bar"}, {"type": "bar"}],
+                   [{"type": "box"}, {"type": "scatter"}]]
+        )
         
         # 1. Integrasi Methods Comparison
-        int_methods = ['Rectangular', 'Trapezoidal', 'Simpson 1/3', 'Richardson']
+        # int_methods = ['Rectangular', 'Trapezoidal', 'Simpson 1/3', 'Richardson']
+        int_methods = ['Trapezoidal', 'Simpson 1/3', 'Richardson']
         int_errors = [
-            abs(val_rect_mid - exact_val) / exact_val * 100,
+            # abs(val_rect_mid - exact_val) / exact_val * 100,
             abs(val_trap - exact_val) / exact_val * 100,
             abs(val_simp13 - exact_val) / exact_val * 100,
             0.0
         ]
         
-        axes[0, 0].barh(int_methods, int_errors, color=['#ff9999', '#66b3ff', '#99ff99', '#ffcc99'])
-        axes[0, 0].set_xlabel('Relative Error (%)')
-        axes[0, 0].set_title('Integrasi: Error Comparison')
-        axes[0, 0].grid(axis='x', alpha=0.3)
+        fig.add_trace(
+            go.Bar(y=int_methods, x=int_errors, orientation='h',
+                  marker_color=['blue', 'green', 'orange'],
+                  hovertemplate='<b>%{y}</b><br>Error: %{x:.4f}%<extra></extra>',
+                  showlegend=False),
+            row=1, col=1
+        )
         
         # 2. Diferensiasi Methods Comparison
         diff_methods = ['Forward', 'Backward', 'Central']
@@ -833,41 +1013,53 @@ if df_raw is not None:
             errors_methods['Central']['RMSE']
         ]
         
-        axes[0, 1].bar(diff_methods, diff_rmse, color=['#ff9999', '#66b3ff', '#99ff99'])
-        axes[0, 1].set_ylabel('RMSE')
-        axes[0, 1].set_title('Diferensiasi: RMSE Comparison')
-        axes[0, 1].grid(axis='y', alpha=0.3)
+        fig.add_trace(
+            go.Bar(x=diff_methods, y=diff_rmse,
+                  marker_color=['orange', 'blue', 'green'],
+                  hovertemplate='<b>%{x}</b><br>RMSE: %{y:.4f}<extra></extra>',
+                  showlegend=False),
+            row=1, col=2
+        )
         
         # 3. Interpolasi Error Distribution
         if len(valid_missing_summary) > 0:
-            # Hitung error per point untuk boxplot
-            newton_errors = np.abs(np.array(y_true_summary) - np.array(y_newton_summary))
             lagrange_errors = np.abs(np.array(y_true_summary) - np.array(y_lagrange_summary))
+            spline_errors = np.abs(np.array(y_true_summary) - np.array(y_spline_summary))
             
-            axes[1, 0].boxplot([newton_errors, lagrange_errors],
-                               labels=['Newton', 'Lagrange'])
-            axes[1, 0].set_ylabel('Absolute Error (kW)')
-            axes[1, 0].set_title('Interpolasi: Error Distribution')
-            axes[1, 0].grid(axis='y', alpha=0.3)
-        else:
-            # Jika tidak ada data, tampilkan pesan
-            axes[1, 0].text(0.5, 0.5, 'No missing data\nfor interpolation', 
-                           ha='center', va='center', fontsize=12)
-            axes[1, 0].set_title('Interpolasi: Error Distribution')
-            axes[1, 0].set_xticks([])
-            axes[1, 0].set_yticks([])
+            fig.add_trace(
+                go.Box(y=lagrange_errors, name='Lagrange',
+                      marker_color='orange',
+                      hovertemplate='<b>Lagrange</b><br>Error: %{y:.4f} kW<extra></extra>'),
+                row=2, col=1
+            )
+            fig.add_trace(
+                go.Box(y=spline_errors, name='Spline',
+                      marker_color='blue',
+                      hovertemplate='<b>Spline</b><br>Error: %{y:.4f} kW<extra></extra>'),
+                row=2, col=1
+            )
         
         # 4. Regresi R² Comparison
-        axes[1, 1].plot(df_comparison['Degree'], df_comparison['R²'], 
-                       marker='o', linewidth=2, markersize=8)
-        axes[1, 1].set_xlabel('Polynomial Degree')
-        axes[1, 1].set_ylabel('R² Score')
-        axes[1, 1].set_title('Regresi: R² vs Degree')
-        axes[1, 1].grid(True, alpha=0.3)
-        axes[1, 1].set_ylim([0, 1])
+        fig.add_trace(
+            go.Scatter(x=df_comparison['Degree'], y=df_comparison['R²'],
+                      mode='lines+markers', name='R²',
+                      line=dict(width=2, color='#66b3ff'),
+                      marker=dict(size=10),
+                      hovertemplate='<b>Degree:</b> %{x}<br><b>R²:</b> %{y:.4f}<extra></extra>',
+                      showlegend=False),
+            row=2, col=2
+        )
         
-        plt.tight_layout()
-        st.pyplot(fig)
+        # Update axes
+        fig.update_xaxes(title_text="Relative Error (%)", row=1, col=1)
+        fig.update_yaxes(title_text="RMSE", row=1, col=2)
+        fig.update_yaxes(title_text="Absolute Error (kW)", row=2, col=1)
+        fig.update_xaxes(title_text="Polynomial Degree", row=2, col=2)
+        fig.update_yaxes(title_text="R² Score", row=2, col=2)
+        
+        fig.update_layout(height=900)
+        
+        st.plotly_chart(fig, use_container_width=True)
         
         # Final Recommendations
         st.subheader("Rekomendasi Akhir")
@@ -888,8 +1080,8 @@ if df_raw is not None:
         - **Use Case:** Deteksi anomali, monitoring perubahan mendadak
         
         **3. Interpolasi:**
-        - **Rekomendasi:** Newton Divided Difference
-        - **Alasan:** Lebih efisien komputasi, hasil identik dengan Lagrange
+        - **Rekomendasi:** Cubic Spline
+        - **Alasan:** Menghindari oscillation, smooth, dan akurat
         - **Use Case:** Recovery missing data, resampling
         
         **4. Regresi Polinomial:**
@@ -912,18 +1104,7 @@ if df_raw is not None:
         - **Saran:** Eksplorasi metode adaptif, wavelet analysis, atau machine learning
         """)
         
-        # Download button untuk hasil
-        st.subheader("Export Hasil Analisis")
-        
-        # Gabungkan semua hasil
-        all_results = {
-            'Integration': summary_integration.to_dict(),
-            'Differentiation': summary_differentiation.to_dict(),
-            'Interpolation': summary_interpolation.to_dict(),
-            'Regression': summary_regression.to_dict()
-        }
-        
-        st.success("Analisis selesai! Semua metode telah dievaluasi dengan komprehensif.")
+        st.success("Analisis selesai! Semua metode telah dievaluasi dengan komprehensif menggunakan visualisasi interaktif Plotly.")
 
 else:
     st.error("Gagal memuat data. Pastikan file 'household_power_consumption.txt' ada di direktori yang sama.")

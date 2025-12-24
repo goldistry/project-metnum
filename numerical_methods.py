@@ -145,47 +145,66 @@ def manual_simpson_38(y, h):
 # 2. DIFERENSIASI NUMERIK 
 # ========================================
 
-    # ========================================
-    # 2. DIFERENSIASI NUMERIK (MANUAL)
-    # ========================================
+def manual_diff_forward(y, h):
+    """
+    Diferensiasi numerik menggunakan Forward Difference
+    Formula: f'(x) = [f(x+h) - f(x)] / h
+    
+    Parameters:
+    - y: array nilai fungsi
+    - h: step size
+    
+    Returns:
+    - array turunan pertama
+    """
+    dy = np.zeros(len(y))
+    for i in range(len(y) - 1):
+        dy[i] = (y[i+1] - y[i]) / h
+    # Untuk titik terakhir, gunakan backward
+    dy[-1] = (y[-1] - y[-2]) / h
+    return dy
 
-    def manual_diff_forward(y, h):
-        """
-        Diferensiasi numerik menggunakan Forward Difference
-        Formula: f'(x) = [f(x+h) - f(x)] / h
-        
-        Parameters:
-        - y: array nilai fungsi
-        - h: step size
-        
-        Returns:
-        - array turunan pertama
-        """
-        dy = np.zeros(len(y))
-        for i in range(len(y) - 1):
-            dy[i] = (y[i+1] - y[i]) / h
-        # Untuk titik terakhir, gunakan backward
-        dy[-1] = (y[-1] - y[-2]) / h
-        return dy
+def manual_diff_backward(y, h):
+    """
+    Diferensiasi numerik menggunakan Backward Difference
+    Formula: f'(x) = [f(x) - f(x-h)] / h
+    
+    Parameters:
+    - y: array nilai fungsi
+    - h: step size
+    
+    Returns:
+    - array turunan pertama
+    """
+    dy = np.zeros(len(y))
+    # Untuk titik pertama, gunakan forward
+    dy[0] = (y[1] - y[0]) / h
+    for i in range(1, len(y)):
+        dy[i] = (y[i] - y[i-1]) / h
+    return dy
 
-    def manual_diff_backward(y, h):
-        """
-        Diferensiasi numerik menggunakan Backward Difference
-        Formula: f'(x) = [f(x) - f(x-h)] / h
-        
-        Parameters:
-        - y: array nilai fungsi
-        - h: step size
-        
-        Returns:
-        - array turunan pertama
-        """
-        dy = np.zeros(len(y))
-        # Untuk titik pertama, gunakan forward
-        dy[0] = (y[1] - y[0]) / h
-        for i in range(1, len(y)):
-            dy[i] = (y[i] - y[i-1]) / h
-        return dy
+def manual_diff_central(y, h):
+    """
+    Diferensiasi numerik menggunakan Central Difference
+    Formula: f'(x) = [f(x+h) - f(x-h)] / (2h)
+    Lebih akurat daripada forward/backward (error O(h^2))
+    
+    Parameters:
+    - y: array nilai fungsi
+    - h: step size
+    
+    Returns:
+    - array turunan pertama
+    """
+    dy = np.zeros(len(y))
+    # Central difference untuk titik tengah
+    for i in range(1, len(y) - 1):
+        dy[i] = (y[i+1] - y[i-1]) / (2 * h)
+    # Forward difference untuk titik pertama
+    dy[0] = (-3*y[0] + 4*y[1] - y[2]) / (2*h)
+    # Backward difference untuk titik terakhir
+    dy[-1] = (3*y[-1] - 4*y[-2] + y[-3]) / (2*h)
+    return dy
 
 def manual_diff_second_order(y, h):
     """
@@ -350,53 +369,53 @@ def evaluate_cubic_spline(spline_coef, x_target):
 # 4. REGRESI POLINOMIAL 
 # ========================================
 
-    # ========================================
-    # 4. REGRESI POLINOMIAL (MANUAL)
-    # ========================================
+def manual_poly_regression(x, y, degree):
+    """
+    Regresi polinomial menggunakan metode Least Squares (OLS)
+    Membangun dan menyelesaikan Normal Equation: (X^T * X) * beta = X^T * y
+    
+    Parameters:
+    - x: array variabel independen
+    - y: array variabel dependen
+    - degree: derajat polinomial
+    
+    Returns:
+    - array koefisien [beta0, beta1, beta2, ..., beta_degree]
+    """
+    n = len(x)
+    # Matriks Vandermonde
+    X = np.zeros((n, degree + 1))
+    for i in range(degree + 1):
+        X[:, i] = x**i
+    
+    # Perhitungan Manual (X^T * X) * beta = X^T * y
+    XT = X.T
+    A = XT @ X
+    B = XT @ y
+    
+    # Solve linear system
+    coeffs = np.linalg.solve(A, B)
+    return coeffs
 
-    def manual_poly_regression(x, y, degree):
-        """
-        Regresi polinomial menggunakan metode Least Squares (OLS)
-        Membangun dan menyelesaikan Normal Equation: (X^T * X) * beta = X^T * y
-        
-        Parameters:
-        - x: array variabel independen
-        - y: array variabel dependen
-        - degree: derajat polinomial
-        
-        Returns:
-        - array koefisien [beta0, beta1, beta2, ..., beta_degree]
-        """
-        n = len(x)
-        # Matriks Vandermonde
-        X = np.zeros((n, degree + 1))
-        for i in range(degree + 1):
-            X[:, i] = x**i
-        
-        # Perhitungan Manual (X^T * X) * beta = X^T * y
-        XT = X.T
-        A = XT @ X
-        B = XT @ y
-        
-        # Solve linear system
-        coeffs = np.linalg.solve(A, B)
-        return coeffs
+def evaluate_polynomial(coeffs, x):
+    """
+    Evaluasi polinomial dengan koefisien yang diberikan
+    
+    Parameters:
+    - coeffs: array koefisien [beta0, beta1, ..., beta_n]
+    - x: nilai atau array nilai x
+    
+    Returns:
+    - nilai polinomial di x
+    """
+    result = 0
+    for i, coeff in enumerate(coeffs):
+        result += coeff * (x ** i)
+    return result
 
-    def evaluate_polynomial(coeffs, x):
-        """
-        Evaluasi polinomial dengan koefisien yang diberikan
-        
-        Parameters:
-        - coeffs: array koefisien [beta0, beta1, ..., beta_n]
-        - x: nilai atau array nilai x
-        
-        Returns:
-        - nilai polinomial di x
-        """
-        result = 0
-        for i, coeff in enumerate(coeffs):
-            result += coeff * (x ** i)
-        return result
+# ========================================
+# 5. FUNGSI ANALISIS ERROR
+# ========================================
 
 def calculate_errors(y_true, y_pred):
     """
@@ -447,61 +466,17 @@ def calculate_errors(y_true, y_pred):
         'Max_Error': max_error
     }
 
-    def calculate_errors(y_true, y_pred):
-        """
-        Menghitung berbagai metrik error
-        
-        Parameters:
-        - y_true: nilai sebenarnya
-        - y_pred: nilai prediksi
-        
-        Returns:
-        - dictionary berisi berbagai metrik error
-        """
-        y_true = np.array(y_true)
-        y_pred = np.array(y_pred)
-        
-        # Mean Absolute Error
-        mae = np.mean(np.abs(y_true - y_pred))
-        
-        # Root Mean Square Error
-        rmse = np.sqrt(np.mean((y_true - y_pred)**2))
-        
-        # Mean Absolute Percentage Error (hindari pembagian dengan nol)
-        mask = y_true != 0
-        mape = np.mean(np.abs((y_true[mask] - y_pred[mask]) / y_true[mask])) * 100
-        
-        # Relative Error (rata-rata)
-        relative_error = np.mean(np.abs((y_true - y_pred) / (y_true + 1e-10))) * 100
-        
-        # R-squared
-        ss_res = np.sum((y_true - y_pred)**2)
-        ss_tot = np.sum((y_true - np.mean(y_true))**2)
-        r2 = 1 - (ss_res / (ss_tot + 1e-10))
-        
-        # Max Absolute Error
-        max_error = np.max(np.abs(y_true - y_pred))
-        
-        return {
-            'MAE': mae,
-            'RMSE': rmse,
-            'MAPE': mape,
-            'Relative_Error': relative_error,
-            'R2': r2,
-            'Max_Error': max_error
-        }
-
-    def richardson_extrapolation(f_h, f_h2, p):
-        """
-        Richardson Extrapolation untuk meningkatkan akurasi
-        Formula: f_improved = (2^p * f(h/2) - f(h)) / (2^p - 1)
-        
-        Parameters:
-        - f_h: hasil dengan step size h
-        - f_h2: hasil dengan step size h/2
-        - p: order of error (1 untuk rectangular, 2 untuk trapezoidal, 4 untuk simpson)
-        
-        Returns:
-        - nilai yang lebih akurat
-        """
-        return (2**p * f_h2 - f_h) / (2**p - 1)
+def richardson_extrapolation(f_h, f_h2, p):
+    """
+    Richardson Extrapolation untuk meningkatkan akurasi
+    Formula: f_improved = (2^p * f(h/2) - f(h)) / (2^p - 1)
+    
+    Parameters:
+    - f_h: hasil dengan step size h
+    - f_h2: hasil dengan step size h/2
+    - p: order of error (1 untuk rectangular, 2 untuk trapezoidal, 4 untuk simpson)
+    
+    Returns:
+    - nilai yang lebih akurat
+    """
+    return (2**p * f_h2 - f_h) / (2**p - 1)

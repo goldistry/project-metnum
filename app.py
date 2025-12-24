@@ -144,10 +144,20 @@ if df_raw is not None:
         val_numpy = np.trapz(power, dx=h)
         
         # Richardson Extrapolation
-        power_half = df_raw.set_index('datetime').resample('30min').mean(numeric_only=True)['Global_active_power'].values
+        # Resample dari df_raw untuk konsistensi
+        df_hourly_check = df_raw.set_index('datetime').resample('H').mean(numeric_only=True)
+        df_halfhour = df_raw.set_index('datetime').resample('30min').mean(numeric_only=True)
+
+        power_h = df_hourly_check['Global_active_power'].values
+        power_h2 = df_halfhour['Global_active_power'].values
+
+        h = 1.0
         h_half = 0.5
-        val_trap_half = manual_trapezoidal(power_half, h_half)
-        val_richardson = richardson_extrapolation(val_trap, val_trap_half, 2)
+
+        val_trap_h = manual_trapezoidal(power_h, h)
+        val_trap_h2 = manual_trapezoidal(power_h2, h_half)
+
+        val_richardson = richardson_extrapolation(val_trap_h, val_trap_h2, 2)
         
         exact_val = val_richardson
         
@@ -238,7 +248,7 @@ if df_raw is not None:
         st.markdown(f"""
         **Observasi:**
         - Metode Simpson 1/3 memberikan error terendah ({errors_rel[methods.index('Simpson 1/3')]:.4f}%)
-        - Metode Rectangular memiliki error tertinggi karena aproksimasi paling sederhana
+        - Metode Trapezoidal memiliki error lebih tinggi dari Simpson karena aproksimasi linear
         - Richardson Extrapolation berhasil meningkatkan akurasi dengan menggabungkan hasil dari dua step size berbeda
         
         **Kesimpulan:**
@@ -415,10 +425,11 @@ if df_raw is not None:
         
         # Simulasi data hilang
         idx_missing = list(range(start_missing, start_missing + n_missing))
-        window_size = 50
         
-        x_full = np.arange(window_size)
-        y_full = power[:window_size].copy()
+        # Sesuaikan window_size dengan slider maximum
+        window_size = 150  # Atau buat dynamic
+        x_full = np.arange(min(window_size, len(power)))
+        y_full = power[:len(x_full)].copy()
         
         # Hapus data pada indeks missing
         x_sample = np.delete(x_full, [i for i in idx_missing if i < window_size])
@@ -533,7 +544,7 @@ if df_raw is not None:
             row=1, col=3
         )
         
-        fig.update_xaxes(title_text="Time Index")
+        fig.update_xaxes(title_text="Time Index (Hours)")
         fig.update_yaxes(title_text="Power (kW)")
         fig.update_layout(height=500)
         
@@ -767,7 +778,9 @@ if df_raw is not None:
         
         fig.add_hline(y=0, line_dash="dash", line_color="red", line_width=2, row=2, col=1)
         
-        fig.update_xaxes(title_text="Time (hours)", row=2, col=1)
+        fig.update_xaxes(title_text="Waktu (Jam ke-n dalam 1 Minggu)", row=1, col=1)
+        fig.update_xaxes(title_text="Waktu (Jam ke-n dalam 1 Minggu)", row=2, col=1)
+        
         fig.update_yaxes(title_text="Power (kW)", row=1, col=1)
         fig.update_yaxes(title_text="Residual (kW)", row=2, col=1)
         fig.update_layout(height=900)
@@ -871,26 +884,33 @@ if df_raw is not None:
         
         best_degree = df_comparison.loc[df_comparison['R²'].idxmax(), 'Degree']
         
+        r2_warning = ""
+        if errors_test['R2'] < 0:
+            r2_warning = f"""> **Catatan Analisis:** Nilai $R^2$ yang negatif ({errors_test['R2']:.4f}) pada data testing menunjukkan bahwa model polinomial derajat {deg} tidak cocok (*poor fit*) untuk data ini. Hal ini mengindikasikan bahwa pola konsumsi listrik sangat fluktuatif sehingga fungsi polinomial sederhana tidak mampu menangkap kompleksitas perubahan data dalam jangka panjang."""
+
         st.markdown(f"""
         **Observasi:**
-        - Derajat optimal (berdasarkan R²): {int(best_degree)}
-        - R² Training: {errors_train['R2']:.4f}
-        - R² Testing: {errors_test['R2']:.4f}
-        - RMSE Testing: {errors_test['RMSE']:.4f} kW
+        - **Konteks Data**: Data mencakup durasi **168 jam (1 minggu)**. Satuan jam ini krusial karena penggunaan listrik memiliki siklus harian (24 jam).
+        - **Derajat optimal** (berdasarkan $R^2$): {int(best_degree)} 
+        - **$R^2$ Training**: {errors_train['R2']:.4f} 
+        - **$R^2$ Testing**: {errors_test['R2']:.4f} 
+        - **RMSE Testing**: {errors_test['RMSE']:.4f} kW 
         
         **Trade-off Bias-Variance:**
-        - Derajat rendah: Underfitting (bias tinggi)
-        - Derajat tinggi: Overfitting (variance tinggi)
-        - Derajat optimal menyeimbangkan keduanya
+        - **Derajat rendah**: Underfitting (bias tinggi) 
+        - **Derajat tinggi**: Overfitting (variance tinggi) 
+        - **Derajat optimal** menyeimbangkan keduanya untuk mendapatkan error generalisasi terkecil. 
         
         **Interpretasi Koefisien:**
-        - Koefisien positif pada x^n: Tren naik
-        - Koefisien negatif: Tren turun
-        - Magnitude koefisien menunjukkan pengaruh terhadap prediksi
+        - Koefisien positif pada $x^n$: Menunjukkan tren kenaikan konsumsi energi seiring waktu. 
+        - Koefisien negatif: Menunjukkan tren penurunan konsumsi energi. 
+        - Magnitude koefisien menunjukkan seberapa besar pengaruh variabel waktu terhadap perubahan power. 
         
         **Kesimpulan:**
-        Regresi polinomial degree {deg} berhasil menangkap tren dengan R² = {errors_test['R2']:.4f}.
-        Residual plot menunjukkan distribusi error yang {"random" if abs(np.mean(residual_test)) < 0.1 else "masih memiliki pola"}.
+        Regresi polinomial derajat {deg} berusaha menangkap tren umum penggunaan energi[cite: 225]. Namun, karena durasi data mencapai 168 jam, model polinomial tunggal sering kali gagal mengikuti pola siklus harian yang tajam.
+        Juga bisa dilihat Residual plot menunjukkan distribusi error yang {"bersifat acak (random)" if abs(np.mean(residual_test)) < 0.1 else "masih memiliki pola tertentu"}.
+        
+        {r2_warning}
         """)
     
     # ========================================
@@ -1034,7 +1054,7 @@ if df_raw is not None:
         
         fig.add_trace(
             go.Bar(y=int_methods, x=int_errors, orientation='h',
-                  marker_color=['#66b3ff', '#99ff99', '#ffcc99'],
+                  marker_color=['blue', 'green', 'orange'],
                 #   marker_color=['#ff9999', '#66b3ff', '#99ff99', '#ffcc99'],
                   hovertemplate='<b>%{y}</b><br>Error: %{x:.4f}%<extra></extra>',
                   showlegend=False),
@@ -1051,7 +1071,7 @@ if df_raw is not None:
         
         fig.add_trace(
             go.Bar(x=diff_methods, y=diff_rmse,
-                  marker_color=['#ff9999', '#66b3ff', '#99ff99'],
+                  marker_color=['orange', 'blue', 'green'],
                   hovertemplate='<b>%{x}</b><br>RMSE: %{y:.4f}<extra></extra>',
                   showlegend=False),
             row=1, col=2
@@ -1065,19 +1085,19 @@ if df_raw is not None:
             
             fig.add_trace(
                 go.Box(y=newton_errors, name='Newton',
-                      marker_color='#99ff99',
+                      marker_color='green',
                       hovertemplate='<b>Newton</b><br>Error: %{y:.4f} kW<extra></extra>'),
                 row=2, col=1
             )
             fig.add_trace(
                 go.Box(y=lagrange_errors, name='Lagrange',
-                      marker_color='#ff99cc',
+                      marker_color='orange',
                       hovertemplate='<b>Lagrange</b><br>Error: %{y:.4f} kW<extra></extra>'),
                 row=2, col=1
             )
             fig.add_trace(
                 go.Box(y=spline_errors, name='Spline',
-                      marker_color='#cc99ff',
+                      marker_color='blue',
                       hovertemplate='<b>Spline</b><br>Error: %{y:.4f} kW<extra></extra>'),
                 row=2, col=1
             )

@@ -60,8 +60,15 @@ def manual_simpson_13(y, h):
     """
     n = len(y) - 1
     if n % 2 != 0:
-        # Jika ganjil, gunakan simpson untuk n-1 titik, trapezoid untuk sisa
-        return manual_simpson_13(y[:-1], h) + (h/2)*(y[-2] + y[-1])
+    # Gunakan Simpson untuk n-3 titik pertama, Simpson 3/8 untuk 4 titik terakhir
+    # Atau gunakan composite approach
+        if n >= 3:
+            result = manual_simpson_13(y[:-3], h)
+            # Simpson 3/8 untuk 4 titik terakhir
+            result += (3*h/8) * (y[-4] + 3*y[-3] + 3*y[-2] + y[-1])
+            return result
+        else:
+            return manual_trapezoidal(y, h)
     
     total = y[0] + y[-1]
     for i in range(1, n):
@@ -211,9 +218,14 @@ def manual_diff_second_order(y, h):
     Returns:
     - array turunan kedua
     """
+    if len(y) < 4:
+        raise ValueError("Minimal 4 data points required for second order derivative")
+    
     d2y = np.zeros(len(y))
+    
     for i in range(1, len(y) - 1):
         d2y[i] = (y[i+1] - 2*y[i] + y[i-1]) / (h**2)
+    
     # Boundary menggunakan forward/backward difference
     d2y[0] = (2*y[0] - 5*y[1] + 4*y[2] - y[3]) / (h**2)
     d2y[-1] = (2*y[-1] - 5*y[-2] + 4*y[-3] - y[-4]) / (h**2)
@@ -469,7 +481,12 @@ def calculate_errors(y_true, y_pred):
     mape = np.mean(np.abs((y_true[mask] - y_pred[mask]) / y_true[mask])) * 100
     
     # Relative Error (rata-rata)
-    relative_error = np.mean(np.abs((y_true - y_pred) / (y_true + 1e-10))) * 100
+    # skip nilai yang terlalu kecil
+    mask = np.abs(y_true) > 0.01  # Skip values < 0.01 kW
+    if np.any(mask):
+        relative_error = np.mean(np.abs((y_true[mask] - y_pred[mask]) / y_true[mask])) * 100
+    else:
+        relative_error = 0.0
     
     # R-squared
     ss_res = np.sum((y_true - y_pred)**2)

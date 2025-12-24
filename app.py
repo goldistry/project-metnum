@@ -64,9 +64,9 @@ if df_raw is not None:
     Dataset berisi pengukuran power consumption setiap menit selama beberapa tahun.
     
     **Metode Numerik yang Digunakan:**
-    1. Integrasi Numerik (Rectangular, Trapezoidal, Simpson 1/3, Simpson 3/8)
+    1. Integrasi Numerik (Trapezoidal, Simpson 1/3, Simpson 3/8, Richardson Extrapolation)
     2. Diferensiasi Numerik (Forward, Backward, Central Difference)
-    3. Interpolasi (Newton Divided Difference & Lagrange)
+    3. Interpolasi (Lagrange & Cubic Spline)
     4. Regresi Polinomial (Least Squares)
     
     **Sumber Data:** UCI Machine Learning Repository - Individual Household Electric Power Consumption
@@ -409,7 +409,6 @@ if df_raw is not None:
         interpolasi polinomial.
         
         **Metode:**
-        - Newton Divided Difference
         - Lagrange Interpolation
         - Cubic Spline
         """)
@@ -436,11 +435,9 @@ if df_raw is not None:
         y_sample = np.delete(y_full, [i for i in idx_missing if i < window_size])
         
         # Interpolasi
-        coef_newton = newton_divided_diff(x_sample, y_sample)
         
         # Evaluasi interpolasi
         x_interp = np.linspace(0, window_size-1, 200)
-        y_newton = [evaluate_newton(x_sample, coef_newton, xi) for xi in x_interp]
         y_lagrange = [lagrange_interpolation(x_sample, y_sample, xi) for xi in x_interp]
         
         # Cubic spline
@@ -450,7 +447,6 @@ if df_raw is not None:
         # Recovery data yang hilang
         x_missing_actual = [i for i in idx_missing if i < window_size]
         y_missing_true = [y_full[i] for i in x_missing_actual]
-        y_missing_newton = [evaluate_newton(x_sample, coef_newton, xi) for xi in x_missing_actual]
         y_missing_lagrange = [lagrange_interpolation(x_sample, y_sample, xi) for xi in x_missing_actual]
         y_missing_spline = evaluate_cubic_spline(spline_coef, np.array(x_missing_actual))
         
@@ -458,36 +454,9 @@ if df_raw is not None:
         st.subheader("Hasil Interpolasi")
         
         fig = make_subplots(
-            rows=1, cols=3,
-            subplot_titles=('Newton Divided Difference', 'Lagrange Interpolation', 
+            rows=1, cols=2,
+            subplot_titles=('Lagrange Interpolation', 
                           'Cubic Spline (No Oscillation!)')
-        )
-        
-        # Plot Newton
-        fig.add_trace(
-            go.Scatter(x=x_sample, y=y_sample, mode='markers',
-                      name='Data Tersedia', marker=dict(size=8, color='blue'),
-                      hovertemplate='<b>Index:</b> %{x}<br><b>Power:</b> %{y:.2f} kW<extra></extra>'),
-            row=1, col=1
-        )
-        fig.add_trace(
-            go.Scatter(x=x_missing_actual, y=y_missing_true, mode='markers',
-                      name='Data Hilang (Truth)', marker=dict(size=10, color='red', symbol='x'),
-                      hovertemplate='<b>Index:</b> %{x}<br><b>True:</b> %{y:.2f} kW<extra></extra>'),
-            row=1, col=1
-        )
-        fig.add_trace(
-            go.Scatter(x=x_interp, y=y_newton, mode='lines',
-                      name='Newton', line=dict(color='green', dash='dash', width=2),
-                      hovertemplate='<b>Index:</b> %{x:.1f}<br><b>Power:</b> %{y:.2f} kW<extra></extra>'),
-            row=1, col=1
-        )
-        fig.add_trace(
-            go.Scatter(x=x_missing_actual, y=y_missing_newton, mode='markers',
-                      name='Prediksi Newton', marker=dict(size=12, color='orange', symbol='triangle-up',
-                      line=dict(width=2, color='black')),
-                      hovertemplate='<b>Index:</b> %{x}<br><b>Pred:</b> %{y:.2f} kW<extra></extra>'),
-            row=1, col=1
         )
         
         # Plot Lagrange
@@ -495,26 +464,26 @@ if df_raw is not None:
             go.Scatter(x=x_sample, y=y_sample, mode='markers',
                       marker=dict(size=8, color='blue'), showlegend=False,
                       hovertemplate='<b>Index:</b> %{x}<br><b>Power:</b> %{y:.2f} kW<extra></extra>'),
-            row=1, col=2
+            row=1, col=1
         )
         fig.add_trace(
             go.Scatter(x=x_missing_actual, y=y_missing_true, mode='markers',
                       marker=dict(size=10, color='red', symbol='x'), showlegend=False,
                       hovertemplate='<b>Index:</b> %{x}<br><b>True:</b> %{y:.2f} kW<extra></extra>'),
-            row=1, col=2
+            row=1, col=1
         )
         fig.add_trace(
             go.Scatter(x=x_interp, y=y_lagrange, mode='lines',
                       line=dict(color='magenta', dash='dash', width=2), showlegend=False,
                       hovertemplate='<b>Index:</b> %{x:.1f}<br><b>Power:</b> %{y:.2f} kW<extra></extra>'),
-            row=1, col=2
+            row=1, col=1
         )
         fig.add_trace(
             go.Scatter(x=x_missing_actual, y=y_missing_lagrange, mode='markers',
                       marker=dict(size=12, color='cyan', symbol='triangle-up',
                       line=dict(width=2, color='black')), showlegend=False,
                       hovertemplate='<b>Index:</b> %{x}<br><b>Pred:</b> %{y:.2f} kW<extra></extra>'),
-            row=1, col=2
+            row=1, col=1
         )
         
         # Plot Cubic Spline
@@ -522,26 +491,26 @@ if df_raw is not None:
             go.Scatter(x=x_sample, y=y_sample, mode='markers',
                       marker=dict(size=8, color='blue'), showlegend=False,
                       hovertemplate='<b>Index:</b> %{x}<br><b>Power:</b> %{y:.2f} kW<extra></extra>'),
-            row=1, col=3
+            row=1, col=2
         )
         fig.add_trace(
             go.Scatter(x=x_missing_actual, y=y_missing_true, mode='markers',
                       marker=dict(size=10, color='red', symbol='x'), showlegend=False,
                       hovertemplate='<b>Index:</b> %{x}<br><b>True:</b> %{y:.2f} kW<extra></extra>'),
-            row=1, col=3
+            row=1, col=2
         )
         fig.add_trace(
             go.Scatter(x=x_interp, y=y_spline, mode='lines',
                       line=dict(color='purple', width=2), showlegend=False,
                       hovertemplate='<b>Index:</b> %{x:.1f}<br><b>Power:</b> %{y:.2f} kW<extra></extra>'),
-            row=1, col=3
+            row=1, col=2
         )
         fig.add_trace(
             go.Scatter(x=x_missing_actual, y=y_missing_spline, mode='markers',
                       marker=dict(size=12, color='yellow', symbol='triangle-up',
                       line=dict(width=2, color='black')), showlegend=False,
                       hovertemplate='<b>Index:</b> %{x}<br><b>Pred:</b> %{y:.2f} kW<extra></extra>'),
-            row=1, col=3
+            row=1, col=2
         )
         
         fig.update_xaxes(title_text="Time Index (Hours)")
@@ -554,12 +523,10 @@ if df_raw is not None:
         st.subheader("Analisis Error Interpolasi")
         
         if len(y_missing_true) > 0:
-            errors_newton = calculate_errors(y_missing_true, y_missing_newton)
             errors_lagrange = calculate_errors(y_missing_true, y_missing_lagrange)
             errors_spline = calculate_errors(y_missing_true, y_missing_spline)
             
             df_interp_error = pd.DataFrame({
-                'Newton': errors_newton,
                 'Lagrange': errors_lagrange,
                 'Cubic Spline': errors_spline
             }).T
@@ -572,10 +539,8 @@ if df_raw is not None:
             df_missing_comparison = pd.DataFrame({
                 'Index': x_missing_actual,
                 'True Value': y_missing_true,
-                'Newton Pred': y_missing_newton,
                 'Lagrange Pred': y_missing_lagrange,
                 'Spline Pred': y_missing_spline,
-                'Newton Error': np.abs(np.array(y_missing_true) - np.array(y_missing_newton)),
                 'Lagrange Error': np.abs(np.array(y_missing_true) - np.array(y_missing_lagrange)),
                 'Spline Error': np.abs(np.array(y_missing_true) - np.array(y_missing_spline))
             })
@@ -586,16 +551,8 @@ if df_raw is not None:
             fig = go.Figure()
             
             x_pos = np.arange(len(x_missing_actual))
-            width = 0.25
+            width = 0.35
             
-            fig.add_trace(go.Bar(
-                x=x_pos - width,
-                y=df_missing_comparison['Newton Error'],
-                name='Newton Error',
-                marker_color='green',
-                opacity=0.7,
-                hovertemplate='<b>Point:</b> %{x}<br><b>Error:</b> %{y:.4f} kW<extra></extra>'
-            ))
             
             fig.add_trace(go.Bar(
                 x=x_pos,
@@ -634,31 +591,24 @@ if df_raw is not None:
         st.subheader("Pembahasan")
         if len(y_missing_true) > 0:
             best_method = min(
-                [('Newton', errors_newton['MAE']), 
-                ('Lagrange', errors_lagrange['MAE']),
+                [('Lagrange', errors_lagrange['MAE']),
                 ('Cubic Spline', errors_spline['MAE'])],
                 key=lambda x: x[1]
             )
             observasi_text = f"""
         **Observasi:**
-        - MAE Newton: {errors_newton['MAE']:.4f} kW
         - MAE Lagrange: {errors_lagrange['MAE']:.4f} kW
         - MAE Cubic Spline: {errors_spline['MAE']:.4f} kW
         
         **Perbandingan Metode:**
-
-        1. **Newton vs Lagrange:**
-        - Secara teoritis identik (polynomial yang sama)
-        - Perbedaan minimal: < 0.001% (floating-point precision)
-
-        2. **Cubic Spline Advantages:**
+        1. **Cubic Spline Advantages:**
         - Menghindari Runge's Phenomenon (tidak oscillate)
         - Smooth interpolation (C² continuity)
         - Error rata-rata: {errors_spline['MAE']:.4f} kW
         - Lebih stable untuk banyak data points
         - Natural boundary conditions
 
-        3. **Kapan Gunakan Cubic Spline?**
+        2. **Kapan Gunakan Cubic Spline?**
         - Data dengan banyak titik (>10 points)
         - Membutuhkan smoothness (aplikasi fisika)
         - Interpolasi jangka panjang
@@ -980,10 +930,6 @@ if df_raw is not None:
             
             y_true_summary = [y_full_summary[i] for i in valid_missing_summary]
             
-            # Newton interpolation
-            coef_newton_summary = newton_divided_diff(x_sample_summary, y_sample_summary)
-            y_newton_summary = [evaluate_newton(x_sample_summary, coef_newton_summary, i) for i in valid_missing_summary]
-            
             # Lagrange interpolation
             y_lagrange_summary = [lagrange_interpolation(x_sample_summary, y_sample_summary, i) for i in valid_missing_summary]
             
@@ -992,26 +938,25 @@ if df_raw is not None:
             y_spline_summary = evaluate_cubic_spline(spline_coef_summary, np.array(valid_missing_summary))
             
             # Hitung error
-            errors_newton_summary = calculate_errors(y_true_summary, y_newton_summary)
             errors_lagrange_summary = calculate_errors(y_true_summary, y_lagrange_summary)
             errors_spline_summary = calculate_errors(y_true_summary, y_spline_summary) 
     
             summary_interpolation = pd.DataFrame({
-                'Metode': ['Newton', 'Lagrange', 'Cubic Spline'],
-                'MAE (kW)': [errors_newton_summary['MAE'], errors_lagrange_summary['MAE'], errors_spline_summary['MAE']],
-                'RMSE (kW)': [errors_newton_summary['RMSE'], errors_lagrange_summary['RMSE'], errors_spline_summary['RMSE']],
-                'MAPE (%)': [errors_newton_summary['MAPE'], errors_lagrange_summary['MAPE'], errors_spline_summary['MAPE']],
-                'Komputasi': ['Efisien', 'Lebih Lambat', 'Moderate'],
-                'Rekomendasi': ['Praktis', 'Teoritis', 'Terbaik']
+                'Metode': ['Lagrange', 'Cubic Spline'],
+                'MAE (kW)': [errors_lagrange_summary['MAE'], errors_spline_summary['MAE']],
+                'RMSE (kW)': [errors_lagrange_summary['RMSE'], errors_spline_summary['RMSE']],
+                'MAPE (%)': [errors_lagrange_summary['MAPE'], errors_spline_summary['MAPE']],
+                'Komputasi': ['Lebih Lambat', 'Moderate'],
+                'Rekomendasi': ['Teoritis', 'Terbaik']
             })
         else:
             summary_interpolation = pd.DataFrame({
-                'Metode': ['Newton', 'Lagrange', 'Cubic Spline'],
-                'MAE (kW)': ['N/A', 'N/A', 'N/A'],
-                'RMSE (kW)': ['N/A', 'N/A', 'N/A'],
-                'MAPE (%)': ['N/A', 'N/A', 'N/A'],
-                'Komputasi': ['Efisien', 'Lebih Lambat', 'Moderate'],
-                'Rekomendasi': ['Praktis', 'Teoritis', 'Terbaik']
+                'Metode': ['Lagrange', 'Cubic Spline'],
+                'MAE (kW)': ['N/A', 'N/A'],
+                'RMSE (kW)': ['N/A', 'N/A'],
+                'MAPE (%)': ['N/A', 'N/A'],
+                'Komputasi': ['Lebih Lambat', 'Moderate'],
+                'Rekomendasi': ['Teoritis', 'Terbaik']
             })
         
         st.dataframe(summary_interpolation, use_container_width=True)
@@ -1055,7 +1000,6 @@ if df_raw is not None:
         fig.add_trace(
             go.Bar(y=int_methods, x=int_errors, orientation='h',
                   marker_color=['blue', 'green', 'orange'],
-                #   marker_color=['#ff9999', '#66b3ff', '#99ff99', '#ffcc99'],
                   hovertemplate='<b>%{y}</b><br>Error: %{x:.4f}%<extra></extra>',
                   showlegend=False),
             row=1, col=1
@@ -1079,16 +1023,9 @@ if df_raw is not None:
         
         # 3. Interpolasi Error Distribution
         if len(valid_missing_summary) > 0:
-            newton_errors = np.abs(np.array(y_true_summary) - np.array(y_newton_summary))
             lagrange_errors = np.abs(np.array(y_true_summary) - np.array(y_lagrange_summary))
             spline_errors = np.abs(np.array(y_true_summary) - np.array(y_spline_summary))
             
-            fig.add_trace(
-                go.Box(y=newton_errors, name='Newton',
-                      marker_color='green',
-                      hovertemplate='<b>Newton</b><br>Error: %{y:.4f} kW<extra></extra>'),
-                row=2, col=1
-            )
             fig.add_trace(
                 go.Box(y=lagrange_errors, name='Lagrange',
                       marker_color='orange',

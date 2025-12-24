@@ -232,47 +232,8 @@ def manual_diff_second_order(y, h):
     return d2y
 
 # ========================================
-# 3. INTERPOLASI NEWTON 
+# 3A. INTERPOLASI LAGRANGE
 # ========================================
-
-def newton_divided_diff(x, y):
-    """
-    Menghitung koefisien untuk interpolasi Newton menggunakan divided difference
-    
-    Parameters:
-    - x: array titik x
-    - y: array nilai fungsi di titik x
-    
-    Returns:
-    - array koefisien divided difference
-    """
-    n = len(y)
-    coef = np.zeros([n, n])
-    coef[:,0] = y
-    
-    for j in range(1, n):
-        for i in range(n - j):
-            coef[i][j] = (coef[i+1][j-1] - coef[i][j-1]) / (x[i+j] - x[i])
-    
-    return coef[0, :]
-
-def evaluate_newton(x_data, coef, x_target):
-    """
-    Evaluasi polinomial Newton di titik x_target
-    
-    Parameters:
-    - x_data: array titik x yang digunakan untuk interpolasi
-    - coef: koefisien dari newton_divided_diff
-    - x_target: titik yang ingin dievaluasi
-    
-    Returns:
-    - nilai interpolasi di x_target
-    """
-    n = len(x_data) - 1
-    p = coef[n]
-    for k in range(1, n + 1):
-        p = coef[n-k] + (x_target - x_data[n-k]) * p
-    return p
 
 def lagrange_interpolation(x_data, y_data, x_target):
     """

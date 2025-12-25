@@ -167,7 +167,7 @@ if df_raw is not None:
             # status_38 = f"Invalid (Interval {n_interval} tidak habis dibagi 3)"
         
         # Nilai referensi
-        val_numpy = np.trapezoid(power_minute, dx=h_minute)
+        val_numpy = np.trapz(power_minute, dx=h_minute)
         
         # Richardson Extrapolation
         power_h2 = power_minute[::2]
@@ -200,7 +200,7 @@ if df_raw is not None:
             # st.metric("Adaptive (Segmented)", f"{val_adaptive:.2f} kWh")
             
         if show_comparison:
-            st.info(f"NumPy Reference (np.trapezoid): {val_numpy:.2f} kWh")
+            st.info(f"NumPy Reference (np.trapz): {val_numpy:.2f} kWh")
         
         # Analisis Error
         st.subheader("Analisis Error")
@@ -1082,7 +1082,7 @@ with tabs[1]:
         **Evaluasi Komprehensif Metode Integrasi:**
         * **Optimasi Kuadratik (Simpson 1/3):** Metode ini tetap menjadi yang paling presisi dengan galat terendah yaitu **{abs(val_simp13 - exact_val) / exact_val * 100:.4f}%**. Hal ini membuktikan bahwa pendekatan parabola sangat efektif untuk memodelkan lengkungan fluktuasi konsumsi listrik mingguan rumah tangga.
         * **Analisis Fenomena Kembar (Trapezoidal vs Simpson 3/8):** Ditemukan bahwa metode Trapezoidal dan Simpson 3/8 menghasilkan nilai yang identik sebesar **{val_trap:.4f} kWh**. Fenomena ini secara numerik menunjukkan bahwa penambahan kompleksitas algoritma pada Simpson 3/8 tidak memberikan peningkatan akurasi jika pola data pada titik-titik interval tertentu lebih cenderung bersifat linear atau jika sisa interval pada metode hybrid didominasi oleh pendekatan linear.
-        * **Validitas Algoritma:** Konsistensi hasil antara metode Trapezoidal manual dengan **NumPy Reference (np.trapezoid)** sebesar **{val_numpy:.2f} kWh** memvalidasi bahwa seluruh fungsi integrasi yang dibangun dalam proyek ini telah bekerja sesuai standar perhitungan saintifik.
+        * **Validitas Algoritma:** Konsistensi hasil antara metode Trapezoidal manual dengan **NumPy Reference (np.trapz)** sebesar **{val_numpy:.2f} kWh** memvalidasi bahwa seluruh fungsi integrasi yang dibangun dalam proyek ini telah bekerja sesuai standar perhitungan saintifik.
         """)
         
         st.dataframe(summary_integration, use_container_width=True)

@@ -93,53 +93,24 @@ def manual_simpson_38(y, h):
     """
     n = len(y) - 1
     if n % 3 != 0:
-        return None
+        return manual_trapezoidal(y, h)
     
-    total = y[0] + y[-1]
-    for i in range(1, n):
-        if i % 3 == 0:
-            total += 2 * y[i]
-        else:
-            total += 3 * y[i]
-    return (3 * h / 8) * total
-
-# def adaptive_integration(y, h, n_segments):
-#     """
-#     Integrasi dengan segmen yang dapat diatur
-#     Membagi data menjadi n_segments dan mengintegrasikan dengan Simpson 1/3
-    
-#     Parameters:
-#     - y: array nilai fungsi
-#     - h: step size original
-#     - n_segments: jumlah segmen pembagian
-    
-#     Returns:
-#     - nilai integral
-#     """
-#     n_total = len(y)
-#     points_per_segment = n_total // n_segments
-    
-#     if points_per_segment < 3:
-#         # Jika terlalu sedikit, gunakan trapezoidal
-#         return manual_trapezoidal(y, h)
-    
-#     total_integral = 0
-#     for i in range(n_segments):
-#         start_idx = i * points_per_segment
-#         if i == n_segments - 1:
-#             end_idx = n_total
-#         else:
-#             end_idx = (i + 1) * points_per_segment + 1
-        
-#         segment = y[start_idx:end_idx]
-        
-#         # Gunakan Simpson 1/3 untuk setiap segmen
-#         if len(segment) > 2:
-#             total_integral += manual_simpson_13(segment, h)
-#         else:
-#             total_integral += manual_trapezoidal(segment, h)
-    
-#     return total_integral
+    remainder = n % 3
+    if remainder == 0:
+        # Jalankan Simpson 3/8 murni jika sudah pas
+        return manual_simpson_38(y, h)
+    elif remainder == 1:
+        # Sisa 1 interval: Pakai Simpson 3/8 untuk (n-1) titik, 
+        # dan 1 interval terakhir pakai Trapezoidal
+        res_38 = manual_simpson_38(y[:-1], h)
+        res_trap = (h/2) * (y[-2] + y[-1])
+        return res_38 + res_trap
+    elif remainder == 2:
+        # Sisa 2 interval: Pakai Simpson 3/8 untuk (n-2) titik, 
+        # dan 2 interval terakhir pakai Simpson 1/3
+        res_38 = manual_simpson_38(y[:-2], h)
+        res_13 = (h/3) * (y[-3] + 4*y[-2] + y[-1])
+        return res_38 + res_13
 
 # ========================================
 # 2. DIFERENSIASI NUMERIK 

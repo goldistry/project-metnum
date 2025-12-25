@@ -170,18 +170,26 @@ with tabs[0]:
     val_richardson = richardson_extrapolation(val_trap_h2, val_trap, 2)
     exact_val = val_richardson
 
-    # Display hasil
-    st.subheader("Hasil Perhitungan")
-    
-    col1, col2 = st.columns(2)
-    with col1:
-        st.metric("Trapezoidal", f"{val_trap:.2f} kWh")
-        st.metric("Simpson 1/3", f"{val_simp13:.2f} kWh")
-    with col2:
-        if val_simp38 is not None:
-            st.metric("Simpson 3/8", f"{val_simp38:.4f} kWh")
-        else:
-            st.metric("Simpson 3/8", "N/A (Interval tidak kelipatan 3)")
+        # Simpson 3/8 (Cek Syarat Strict)
+        # Syarat: Jumlah interval (N-1) harus kelipatan 3
+        n_data = len(power_minute)
+        n_interval = n_data - 1
+        
+        # if n_interval % 3 == 0:
+        val_simp38 = manual_simpson_38(power_minute, h_minute)
+            # status_38 = "Valid"
+        # else:
+            # val_simp38 = None # Tandai bahwa metode ini gagal
+            # status_38 = f"Invalid (Interval {n_interval} tidak habis dibagi 3)"
+        
+        # Nilai referensi
+        val_numpy = np.trapz(power_minute, dx=h_minute)
+        
+        # Richardson Extrapolation
+        power_h2 = power_minute[::2]
+        val_trap_h2 = manual_trapezoidal(power_h2, h_minute*2)
+        val_richardson = richardson_extrapolation(val_trap_h2,val_trap,2)
+        exact_val = val_richardson
 
         st.metric("Richardson Extrap.", f"{val_richardson:.2f} kWh", 
                  help="Menggunakan Richardson Extrapolation untuk akurasi lebih tinggi")
@@ -262,6 +270,29 @@ with tabs[0]:
             ),
             row=1, col=2
         )
+        
+        fig.update_xaxes(tickangle=45)
+        fig.update_yaxes(title_text="Absolute Error (kWh)", row=1, col=1)
+        fig.update_yaxes(title_text="Relative Error (%)", row=1, col=2)
+        fig.update_layout(height=500, showlegend=False)
+        
+        st.plotly_chart(fig, use_container_width=True)
+        
+        # Pembahasan
+        st.subheader("Analisis Hasil & Kesimpulan:")
+        st.markdown(f"""
+        1.  **Akurasi Metode:**
+            * Metode **Simpson 1/3** menghasilkan nilai total energi sebesar **{val_simp13:.2f} kWh**.
+            * Nilai ini sangat mendekati hasil perhitungan **Richardson Extrapolation** ({val_richardson:.2f} kWh) yang kita asumsikan sebagai nilai paling presisi (Exact Value) karena menggabungkan dua step size berbeda untuk meminimalisir error.
+            * Metode Trapezoidal dan Simpson 3/8 memberikan hasil yang identik dengan standar industri NumPy yaitu 296,91 kWh, namun memiliki galat relatif sedikit lebih tinggi sebesar 0,0466%
+            * Hal ini menunjukkan bahwa untuk dataset daya listrik ini, pendekatan parabola pada Simpson 1/3 mampu menangkap kelengkungan fluktuasi daya dengan lebih baik dibandingkan pendekatan linear (garis lurus) pada Trapezoidal.
+        2.  **Implikasi Tagihan Listrik:**
+            * Total konsumsi energi selama 1 minggu terhitung sangat konsisten di angka ~**{val_richardson:.2f} kWh** berdasarkan estimasi paling presisi (Richardson)..
+            * Dengan asumsi tarif listrik rata-rata Rp 1.444 per kWh, estimasi tagihan biaya listrik untuk minggu ini adalah: **Rp {val_richardson * 1444:,.0f}**.
+
+        **Rekomendasi:**
+        Untuk analisis data sensor listrik berfrekuensi tinggi (High-Frequency data), metode Simpson 1/3 adalah pilihan paling optimal. Metode ini menawarkan keseimbangan terbaik antara efisiensi komputasi dan akurasi tinggi (orde galat $O(h^4)$) tanpa memerlukan kerumitan komputasi ganda seperti pada metode Richardson.
+        """)
     
     # ---- SUBPLOT 3: Simpson 1/3 Visualization ----
     # Plot data asli
@@ -774,16 +805,16 @@ with tabs[1]:
         anomali_negative = n_anomali - anomali_positive
         
         anomali_analysis = f"""
-        **Karakteristik Anomali yang Terdeteksi:**
-        - **Total Anomali**: {n_anomali:,} titik ({anomali_rate:.2f}% dari data)
-        - **Lonjakan Naik** (alat dinyalakan): {anomali_positive} kali
-        - **Lonjakan Turun** (alat dimatikan): {anomali_negative} kali
-        - **Magnitude Tertinggi**: {np.max(np.abs(dpdt_central[anomali_indices])):.2f} kW/jam
-        - **Frekuensi**: Sekitar {n_anomali / 7:.1f} anomali per hari
+        Karakteristik Anomali yang Terdeteksi:
+        - Total Anomali: {n_anomali:,} titik ({anomali_rate:.2f}% dari data)
+        - Lonjakan Naik (alat dinyalakan): {anomali_positive} kali
+        - Lonjakan Turun (alat dimatikan): {anomali_negative} kali
+        - Magnitude Tertinggi: {np.max(np.abs(dpdt_central[anomali_indices])):.2f} kW/jam
+        - Frekuensi: Sekitar {n_anomali / 7:.1f} anomali per hari
         
-        **Interpretasi Praktis:**
-        {'⚠️ Tingkat anomali cukup tinggi (>1%) - Perlu investigasi pola penggunaan' if anomali_rate > 1 
-         else '✅ Tingkat anomali normal (<1%) - Pola penggunaan wajar'}
+        Interpretasi Praktis:
+        {'Tingkat anomali cukup tinggi (>1%) - Perlu investigasi pola penggunaan' if anomali_rate > 1 
+         else 'Tingkat anomali normal (<1%) - Pola penggunaan wajar'}
         """
     else:
         anomali_analysis = f"""

@@ -264,7 +264,6 @@ if df_raw is not None:
         1.  **Akurasi Metode:**
             * Metode **Simpson 1/3** menghasilkan nilai total energi sebesar **{val_simp13:.2f} kWh**.
             * Nilai ini sangat mendekati hasil perhitungan **Richardson Extrapolation** ({val_richardson:.2f} kWh) yang kita asumsikan sebagai nilai paling presisi (Exact Value) karena menggabungkan dua step size berbeda untuk meminimalisir error.
-            * Metode Trapezoidal dan Simpson 3/8 memberikan hasil yang identik dengan standar industri NumPy yaitu 296,91 kWh, namun memiliki galat relatif sedikit lebih tinggi sebesar 0,0466%
             * Hal ini menunjukkan bahwa untuk dataset daya listrik ini, pendekatan parabola pada Simpson 1/3 mampu menangkap kelengkungan fluktuasi daya dengan lebih baik dibandingkan pendekatan linear (garis lurus) pada Trapezoidal.
         2.  **Implikasi Tagihan Listrik:**
             * Total konsumsi energi selama 1 minggu terhitung sangat konsisten di angka ~**{val_richardson:.2f} kWh** berdasarkan estimasi paling presisi (Richardson)..

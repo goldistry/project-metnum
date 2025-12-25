@@ -332,12 +332,12 @@ with tabs[1]:
     # Info Box Anomali
     if n_anomali > 0:
         st.warning(f"""
-        ⚠️ **Terdeteksi {n_anomali:,} titik anomali** ({anomali_rate:.2f}% dari total data)
+         **Terdeteksi {n_anomali:,} titik anomali** ({anomali_rate:.2f}% dari total data)
         - **Lonjakan terbesar**: {np.max(np.abs(dpdt_central)):.2f} kW/jam
         - **Waktu pertama**: {df_minute['datetime'].iloc[anomali_indices[0]].strftime('%Y-%m-%d %H:%M')}
         """)
     else:
-        st.success(f"✅ Tidak ada anomali terdeteksi dengan threshold {threshold:.1f} kW/jam")
+        st.success(f" Tidak ada anomali terdeteksi dengan threshold {threshold:.1f} kW/jam")
     
     # 4. Visualisasi dengan Highlight Anomali
     st.subheader("Visualisasi Perbandingan Metode")
@@ -351,8 +351,8 @@ with tabs[1]:
             '4. Central Difference (Best - O(h²)) + Anomali',
             '5. Second Derivative (Acceleration)', ''
         ),
-        vertical_spacing=0.1,
-        shared_xaxes=True,
+        vertical_spacing=0.2,
+        shared_xaxes=False,
         specs=[[{}, {}], [{}, {}], [{"colspan": 2}, None]]
     )
     
@@ -438,9 +438,20 @@ with tabs[1]:
     fig.update_yaxes(title_text="dP/dt (kW/jam)", row=2, col=1)
     fig.update_yaxes(title_text="dP/dt (kW/jam)", row=2, col=2)
     fig.update_yaxes(title_text="d²P/dt² (kW/jam²)", row=3, col=1)
+
+    # Tambahkan keterangan sumbu X untuk semua grafik
+    fig.update_xaxes(title_text="Waktu", row=1, col=1)
+    fig.update_xaxes(title_text="Waktu", row=1, col=2)
+    fig.update_xaxes(title_text="Waktu", row=2, col=1)
+    fig.update_xaxes(title_text="Waktu", row=2, col=2)
     fig.update_xaxes(title_text="Waktu", row=3, col=1)
-    fig.update_layout(height=1000, showlegend=False, 
-                      title_text=f"Analisis Diferensiasi Lengkap ({n_anomali} Anomali Terdeteksi)")
+
+    fig.update_layout(
+        height=1000, 
+        showlegend=False, 
+        title_text=f"Analisis Diferensiasi Lengkap ({n_anomali} Anomali Terdeteksi)",
+        margin=dict(t=50, b=50) # Memberi ruang agar label sumbu X tidak terpotong
+    )
     st.plotly_chart(fig, use_container_width=True)
     
     # 5. Tabel Anomali & Error Analysis

@@ -45,22 +45,13 @@ def load_and_clean_data():
 df_raw = load_and_clean_data()
 
 if df_raw is not None:
-    # # Resample ke hourly data
-    # df_hourly = df_raw.set_index('datetime').resample('H').mean(numeric_only=True).reset_index()
-    
-    # # Data untuk analisis
-    # power = df_hourly['Global_active_power'].values
-    # h = 1.0  # Step size dalam jam
-    
-
-
-   # 1. DATA MENIT (Resolusi Tinggi)
+    # 1. DATA MENIT
     # Digunakan untuk: Integrasi (Akurasi), Diferensiasi (Anomali), Interpolasi (Recovery)
     df_minute = df_raw.reset_index(drop=True)
     power_minute = df_minute['Global_active_power'].values
     h_minute = 1.0 / 60.0 # Step size 1 menit = 1/60 jam (Agar output tetap kWh)
     
-    # 2. DATA JAM (Resolusi Rendah)
+    # 2. DATA JAM
     # Digunakan khusus untuk: Regresi (Agar pola tren terlihat jelas dan tidak noisy)
     df_hourly = df_minute.set_index('datetime').resample('H').mean(numeric_only=True).reset_index()
     df_hourly = df_hourly.dropna(subset=['Global_active_power']) # Hapus NaN sisa resample
@@ -130,171 +121,410 @@ if df_raw is not None:
         "5. Kesimpulan"
     ])
     
-    # ========================================
-    # TAB 1: INTEGRASI NUMERIK
-    # ========================================
+   # ========================================
+# TAB 1: INTEGRASI NUMERIK
+# ========================================
+
+with tabs[0]:
+    st.header("Integrasi Numerik: Menghitung Total Energi Konsumsi (kWh)")
     
-    with tabs[0]:
-        st.header("Integrasi Numerik: Menghitung Total Energi Konsumsi (kWh)")
-        
-        st.markdown("""
-        **Tujuan:** Menghitung total energi yang dikonsumsi selama 1 minggu dengan mengintegrasikan
-        kurva power consumption terhadap waktu.
-        
-        **Formula:** Energy (kWh) = ∫ Power(t) dt
-        """)
-        
-        st.subheader("Pengaturan Parameter Integrasi")
-        
-        # col1, col2 = st.columns([1, 1])
-        # col1, col2 = st.columns([1, 1])
-        
-        # with col1:
-        #     n_segments = st.slider(
-        #         "Jumlah Segmen untuk Adaptive Integration",
-        #         min_value=1,
-        #         max_value=20,
-        #         value=5,
-        #         help="Membagi data menjadi beberapa segmen untuk integrasi yang lebih akurat"
-        #     )
-        
-        # with col1:
-        show_comparison = st.checkbox("Tampilkan Perbandingan dengan NumPy", value=True)
-        
-        st.markdown("---")
-        
-        # Hitung integral dengan berbagai metode
-        # val_rect_left = manual_rectangular(power, h, method='left')
-        # val_rect_right = manual_rectangular(power, h, method='right')
-        # val_rect_mid = manual_rectangular(power, h, method='midpoint')
-       
-        # val_trap = manual_trapezoidal(power, h)
-        # val_simp13 = manual_simpson_13(power, h)
-        # val_simp38 = manual_simpson_38(power, h)
+    st.markdown("""
+    **Tujuan:** Menghitung total energi yang dikonsumsi selama 1 minggu dengan mengintegrasikan
+    kurva power consumption terhadap waktu.
+    
+    **Formula:** Energy (kWh) = ∫ Power(t) dt
+    
+    **Konsep Dasar:**
+    - Integrasi = Menghitung luas area di bawah kurva
+    - Data diskrit → Perlu metode numerik untuk aproksimasi
+    - Akurasi bergantung pada: step size (h) dan bentuk kurva
+    """)
+    
+    st.subheader("Pengaturan Parameter Integrasi")
+    
+    show_comparison = st.checkbox("Tampilkan Perbandingan dengan NumPy", value=True)
+    
+    st.markdown("---")
+    
+    # Hitung integral dengan berbagai metode
+    val_trap = manual_trapezoidal(power_minute, h_minute)
+    val_simp13 = manual_simpson_13(power_minute, h_minute)
 
-        val_trap = manual_trapezoidal(power_minute, h_minute)
-        val_simp13 = manual_simpson_13(power_minute, h_minute)
+    # Simpson 3/8 (Cek Syarat Strict)
+    n_data = len(power_minute)
+    n_interval = n_data - 1
+    
+    if n_interval % 3 == 0:
+        val_simp38 = manual_simpson_38(power_minute, h_minute)
+        status_38 = "Valid"
+    else:
+        val_simp38 = None
+        status_38 = f"Invalid (Interval {n_interval} tidak habis dibagi 3)"
+    
+    # Nilai referensi
+    val_numpy = np.trapz(power_minute, dx=h_minute)
+    
+    # Richardson Extrapolation
+    power_h2 = power_minute[::2]
+    val_trap_h2 = manual_trapezoidal(power_h2, h_minute*2)
+    val_richardson = richardson_extrapolation(val_trap_h2, val_trap, 2)
+    exact_val = val_richardson
 
-        # Simpson 3/8 (Cek Syarat Strict)
-        # Syarat: Jumlah interval (N-1) harus kelipatan 3
-        n_data = len(power_minute)
-        n_interval = n_data - 1
-        
-        if n_interval % 3 == 0:
-            val_simp38 = manual_simpson_38(power_minute, h_minute)
-            status_38 = "Valid"
+    # Display hasil
+    st.subheader("Hasil Perhitungan")
+    
+    col1, col2 = st.columns(2)
+    with col1:
+        st.metric("Trapezoidal", f"{val_trap:.2f} kWh")
+        st.metric("Simpson 1/3", f"{val_simp13:.2f} kWh")
+    with col2:
+        if val_simp38 is not None:
+            st.metric("Simpson 3/8", f"{val_simp38:.4f} kWh")
         else:
-            val_simp38 = None # Tandai bahwa metode ini gagal
-            status_38 = f"Invalid (Interval {n_interval} tidak habis dibagi 3)"
-        
-        # Nilai referensi
-        val_numpy = np.trapz(power_minute, dx=h_minute)
-        
-        # Richardson Extrapolation
-        power_h2 = power_minute[::2]
-        val_trap_h2 = manual_trapezoidal(power_h2, h_minute*2)
-        val_richardson = richardson_extrapolation(val_trap, val_trap_h2, 2)
-        exact_val = val_richardson
+            st.metric("Simpson 3/8", "N/A (Interval tidak kelipatan 3)")
 
-        # Display hasil
-        st.subheader("Hasil Perhitungan")
+        st.metric("Richardson Extrap.", f"{val_richardson:.2f} kWh", 
+                 help="Menggunakan Richardson Extrapolation untuk akurasi lebih tinggi")
         
-        # col1, col2, col3, col4 = st.columns(4)
-        col1, col2 = st.columns(2)
-        # with col1:
-            # st.metric("Rectangular (Left)", f"{val_rect_left:.2f} kWh")
-            # st.metric("Rectangular (Right)", f"{val_rect_right:.2f} kWh")
-        with col1:
-            # st.metric("Rectangular (Mid)", f"{val_rect_mid:.2f} kWh")
-            st.metric("Trapezoidal", f"{val_trap:.2f} kWh")
-            st.metric("Simpson 1/3", f"{val_simp13:.2f} kWh")
-        with col2:
-            if val_simp38 is not None:
-                st.metric("Simpson 3/8", f"{val_simp38:.4f} kWh")
-            else:
-                st.metric("Simpson 3/8", "N/A (Interval tidak kelipatan 3)")
-
-            st.metric("Richardson Extrap.", f"{val_richardson:.2f} kWh", 
-                     help="Menggunakan Richardson Extrapolation untuk akurasi lebih tinggi")
-        # with col3:
-            
-            # st.metric("Adaptive (Segmented)", f"{val_adaptive:.2f} kWh")
-            
-        if show_comparison:
-            st.info(f"NumPy Reference (np.trapz): {val_numpy:.2f} kWh")
-        
-        # Analisis Error
-        st.subheader("Analisis Error")
-        
-        # methods = ['Rect (Left)', 'Rect (Right)', 'Rect (Mid)', 'Trapezoidal', 
-        #            'Simpson 1/3', 'Adaptive', 'NumPy']
-        methods = ['Richardson (Benchmark)','Trapezoidal', 
-                   'Simpson 1/3', 'NumPy']
-        # values = [val_rect_left, val_rect_right, val_rect_mid, val_trap, 
-        #           val_simp13, val_adaptive, val_numpy]
-        values = [val_richardson, val_trap, val_simp13, val_numpy]
-        
-        if val_simp38:
-            methods.insert(-1, 'Simpson 3/8')
-            values.insert(-1, val_simp38)
-        
-        errors_abs = [abs(v - exact_val) for v in values]
-        errors_rel = [abs(v - exact_val) / exact_val * 100 for v in values]
-        
-        df_error = pd.DataFrame({
-            'Metode': methods,
-            'Hasil (kWh)': [f"{v:.4f}" for v in values],
-            'Absolute Error': [f"{e:.4f}" for e in errors_abs],
-            'Relative Error (%)': [f"{e:.4f}" for e in errors_rel]
-        })
-        
-        st.dataframe(df_error, use_container_width=True)
-        
-        # Visualisasi error dengan Plotly
-        fig = make_subplots(
-            rows=1, cols=2,
-            subplot_titles=('Absolute Error Comparison', 'Relative Error Comparison')
-        )
-        
-        # Absolute Error
+    if show_comparison:
+        st.info(f"📊 NumPy Reference (np.trapz): {val_numpy:.2f} kWh")
+    
+    # ========================================
+    # VISUALISASI KURVA ASLI + METODE INTEGRASI
+    # ========================================
+    st.subheader("Visualisasi Data & Metode Integrasi")
+    
+    # Ambil subset data untuk visualisasi (1 hari pertama = 1440 menit)
+    viz_window = 1440  # 1 hari
+    time_viz = np.arange(viz_window) * h_minute  # Konversi ke jam
+    power_viz = power_minute[:viz_window]
+    
+    fig = make_subplots(
+        rows=2, cols=2,
+        subplot_titles=(
+            '1. Data Asli Power Consumption (1 Hari)',
+            '2. Trapezoidal Rule (Linear Approximation)',
+            '3. Simpson 1/3 (Parabolic Approximation)',
+            '4. Perbandingan Area (Zoom In)'
+        ),
+        vertical_spacing=0.12,
+        horizontal_spacing=0.1
+    )
+    
+    # ---- SUBPLOT 1: Data Asli ----
+    fig.add_trace(
+        go.Scatter(
+            x=time_viz, 
+            y=power_viz,
+            mode='lines',
+            name='Data Asli',
+            line=dict(color='blue', width=1.5),
+            fill='tozeroy',
+            fillcolor='rgba(0,100,255,0.1)',
+            hovertemplate='<b>Time:</b> %{x:.2f}h<br><b>Power:</b> %{y:.3f} kW<extra></extra>'
+        ),
+        row=1, col=1
+    )
+    
+    # ---- SUBPLOT 2: Trapezoidal Visualization ----
+    # Ambil subset kecil untuk zoom (30 menit = 30 data points)
+    zoom_start = 500
+    zoom_end = zoom_start + 30
+    time_zoom = time_viz[zoom_start:zoom_end]
+    power_zoom = power_viz[zoom_start:zoom_end]
+    
+    # Plot data asli
+    fig.add_trace(
+        go.Scatter(
+            x=time_zoom, 
+            y=power_zoom,
+            mode='lines+markers',
+            name='Data',
+            line=dict(color='blue', width=2),
+            marker=dict(size=6, color='blue'),
+            showlegend=False
+        ),
+        row=1, col=2
+    )
+    
+    # Visualisasi trapezoid (garis linear antar titik)
+    for i in range(len(time_zoom)-1):
+        # Area trapezoid
         fig.add_trace(
-            go.Bar(x=methods, y=errors_abs, name='Absolute Error',
-                   marker_color='steelblue', opacity=0.7,
-                   hovertemplate='<b>%{x}</b><br>Error: %{y:.4f} kWh<extra></extra>'),
-            row=1, col=1
-        )
-        
-        # Relative Error
-        fig.add_trace(
-            go.Bar(x=methods, y=errors_rel, name='Relative Error',
-                   marker_color='coral', opacity=0.7,
-                   hovertemplate='<b>%{x}</b><br>Error: %{y:.4f}%<extra></extra>'),
+            go.Scatter(
+                x=[time_zoom[i], time_zoom[i+1], time_zoom[i+1], time_zoom[i]],
+                y=[0, 0, power_zoom[i+1], power_zoom[i]],
+                fill='toself',
+                fillcolor='rgba(255,165,0,0.2)',
+                line=dict(color='orange', width=1),
+                showlegend=False,
+                hoverinfo='skip'
+            ),
             row=1, col=2
         )
-        
-        fig.update_xaxes(tickangle=45)
-        fig.update_yaxes(title_text="Absolute Error (kWh)", row=1, col=1)
-        fig.update_yaxes(title_text="Relative Error (%)", row=1, col=2)
-        fig.update_layout(height=500, showlegend=False)
-        
-        st.plotly_chart(fig, use_container_width=True)
-        
-        # Pembahasan
-        st.subheader("Analisis Hasil & Kesimpulan:")
-        st.markdown(f"""
-        1.  **Akurasi Metode:**
-            * Metode **Simpson 1/3** menghasilkan nilai total energi sebesar **{val_simp13:.2f} kWh**.
-            * Nilai ini sangat mendekati hasil perhitungan **Richardson Extrapolation** ({val_richardson:.2f} kWh) yang kita asumsikan sebagai nilai paling presisi (Exact Value) karena menggabungkan dua step size berbeda untuk meminimalisir error.
-            * Metode **Trapezoidal** memiliki error yang sedikit lebih besar karena ia mengasumsikan garis lurus antar titik, padahal grafik listrik sering melengkung (non-linear).
-
-        2.  **Implikasi Tagihan Listrik:**
-            * Total konsumsi 1 minggu terhitung sebesar ~**{val_richardson:.2f} kWh**.
-            * Jika diasumsikan tarif listrik rata-rata adalah Rp 1.444 per kWh, maka estimasi biaya minggu ini adalah: **Rp {val_richardson * 1444:,.0f}**.
-
-        **Rekomendasi:**
-        Untuk kasus data *High-Frequency* seperti sensor listrik ini, **Simpson 1/3** adalah metode terbaik karena menawarkan keseimbangan antara akurasi tinggi (orde error $O(h^4)$) dibandingkan Trapezoidal, tanpa perlu komputasi ganda seperti Richardson.
-        """)
     
+    # ---- SUBPLOT 3: Simpson 1/3 Visualization ----
+    # Plot data asli
+    fig.add_trace(
+        go.Scatter(
+            x=time_zoom, 
+            y=power_zoom,
+            mode='lines+markers',
+            name='Data',
+            line=dict(color='blue', width=2),
+            marker=dict(size=6, color='blue'),
+            showlegend=False
+        ),
+        row=2, col=1
+    )
+    
+    # Visualisasi parabolic interpolation (setiap 2 interval)
+    for i in range(0, len(time_zoom)-2, 2):
+        if i+2 < len(time_zoom):
+            # Buat kurva parabola melalui 3 titik
+            x_para = np.array([time_zoom[i], time_zoom[i+1], time_zoom[i+2]])
+            y_para = np.array([power_zoom[i], power_zoom[i+1], power_zoom[i+2]])
+            
+            # Interpolasi parabola dengan lebih banyak titik untuk smooth
+            x_smooth = np.linspace(x_para[0], x_para[2], 20)
+            y_smooth = []
+            for x_val in x_smooth:
+                y_val = lagrange_interpolation(x_para, y_para, x_val)
+                y_smooth.append(y_val)
+            
+            # Plot parabola
+            fig.add_trace(
+                go.Scatter(
+                    x=np.concatenate([[x_smooth[0]], x_smooth, [x_smooth[-1]]]),
+                    y=np.concatenate([[0], y_smooth, [0]]),
+                    fill='toself',
+                    fillcolor='rgba(0,255,0,0.15)',
+                    line=dict(color='green', width=1.5),
+                    showlegend=False,
+                    hoverinfo='skip'
+                ),
+                row=2, col=1
+            )
+    
+    # ---- SUBPLOT 4: Perbandingan Error ----
+    # Fokus pada area dengan perubahan tajam
+    zoom_sharp_start = 720  # Jam ke-12 (biasanya ada perubahan pola)
+    zoom_sharp_end = zoom_sharp_start + 60
+    time_sharp = time_viz[zoom_sharp_start:zoom_sharp_end]
+    power_sharp = power_viz[zoom_sharp_start:zoom_sharp_end]
+    
+    fig.add_trace(
+        go.Scatter(
+            x=time_sharp, 
+            y=power_sharp,
+            mode='lines',
+            name='Data Asli',
+            line=dict(color='blue', width=2),
+            fill='tozeroy',
+            fillcolor='rgba(0,100,255,0.2)'
+        ),
+        row=2, col=2
+    )
+    
+    # Tambahkan label area
+    fig.add_annotation(
+        x=time_sharp[len(time_sharp)//2],
+        y=np.max(power_sharp) * 0.5,
+        text="Area = Energi Total",
+        showarrow=False,
+        font=dict(size=12, color='red'),
+        row=2, col=2
+    )
+    
+    # Update axes labels
+    fig.update_xaxes(title_text="Waktu (jam)", row=1, col=1)
+    fig.update_xaxes(title_text="Waktu (jam)", row=1, col=2)
+    fig.update_xaxes(title_text="Waktu (jam)", row=2, col=1)
+    fig.update_xaxes(title_text="Waktu (jam)", row=2, col=2)
+    
+    fig.update_yaxes(title_text="Power (kW)", row=1, col=1)
+    fig.update_yaxes(title_text="Power (kW)", row=1, col=2)
+    fig.update_yaxes(title_text="Power (kW)", row=2, col=1)
+    fig.update_yaxes(title_text="Power (kW)", row=2, col=2)
+    
+    fig.update_layout(
+        height=900,
+        showlegend=False,
+        title_text="Perbandingan Visual Metode Integrasi Numerik"
+    )
+    
+    st.plotly_chart(fig, use_container_width=True)
+    
+    st.info("""
+    💡 **Interpretasi Visual:**
+    - **Subplot 1:** Data asli menunjukkan fluktuasi yang kompleks
+    - **Subplot 2 (Trapezoidal):** Area dihitung dengan trapesium (garis lurus) - Simple but effective
+    - **Subplot 3 (Simpson 1/3):** Area dihitung dengan parabola - Lebih smooth, tapi bisa overfit pada data noise
+    - **Subplot 4:** Area di bawah kurva = Total energi yang dikonsumsi
+    """)
+    
+    # ========================================
+    # ANALISIS ERROR
+    # ========================================
+    st.subheader("Analisis Error")
+    
+    methods = ['Richardson (Benchmark)','Trapezoidal', 
+               'Simpson 1/3', 'NumPy']
+    values = [val_richardson, val_trap, val_simp13, val_numpy]
+    
+    if val_simp38:
+        methods.insert(-1, 'Simpson 3/8')
+        values.insert(-1, val_simp38)
+    
+    errors_abs = [abs(v - exact_val) for v in values]
+    errors_rel = [abs(v - exact_val) / exact_val * 100 for v in values]
+    
+    df_error = pd.DataFrame({
+        'Metode': methods,
+        'Hasil (kWh)': [f"{v:.4f}" for v in values],
+        'Absolute Error': [f"{e:.4f}" for e in errors_abs],
+        'Relative Error (%)': [f"{e:.4f}" for e in errors_rel]
+    })
+    
+    st.dataframe(df_error, use_container_width=True)
+    
+    # Visualisasi error dengan Plotly
+    fig = make_subplots(
+        rows=1, cols=2,
+        subplot_titles=('Absolute Error Comparison', 'Relative Error Comparison')
+    )
+    
+    # Absolute Error
+    fig.add_trace(
+        go.Bar(x=methods, y=errors_abs, name='Absolute Error',
+               marker_color='steelblue', opacity=0.7,
+               hovertemplate='<b>%{x}</b><br>Error: %{y:.4f} kWh<extra></extra>'),
+        row=1, col=1
+    )
+    
+    # Relative Error
+    fig.add_trace(
+        go.Bar(x=methods, y=errors_rel, name='Relative Error',
+               marker_color='coral', opacity=0.7,
+               hovertemplate='<b>%{x}</b><br>Error: %{y:.4f}%<extra></extra>'),
+        row=1, col=2
+    )
+    
+    fig.update_xaxes(tickangle=45)
+    fig.update_yaxes(title_text="Absolute Error (kWh)", row=1, col=1)
+    fig.update_yaxes(title_text="Relative Error (%)", row=1, col=2)
+    fig.update_layout(height=500, showlegend=False)
+    
+    st.plotly_chart(fig, use_container_width=True)
+    
+    # ========================================
+    # PEMBAHASAN MENDALAM
+    # ========================================
+    st.subheader("Analisis Hasil & Kesimpulan:")
+    
+    # Hitung selisih error antara metode
+    error_trap_rel = abs(val_trap - exact_val) / exact_val * 100
+    error_simp13_rel = abs(val_simp13 - exact_val) / exact_val * 100
+    
+    # Tentukan metode terbaik
+    if error_trap_rel < error_simp13_rel:
+        best_method = "Trapezoidal"
+        best_error = error_trap_rel
+        reason = """
+        **Mengapa Trapezoidal Lebih Baik?**
+        
+        Meskipun Simpson 1/3 secara teoritis memiliki orde error lebih tinggi ($O(h^4)$) dibanding Trapezoidal ($O(h^2)$), 
+        dalam kasus data konsumsi listrik ini, **Trapezoidal justru memberikan hasil lebih akurat**. Berikut alasannya:
+        
+        1. **Data Memiliki Noise Tinggi:**
+           - Data sensor listrik real-world mengandung fluktuasi diskrit (on/off alat)
+           - Simpson 1/3 menggunakan parabola (kurva lengkung) yang bisa "overfit" pada noise
+           - Trapezoidal menggunakan garis lurus yang lebih robust terhadap noise
+        
+        2. **Karakteristik Data Step-wise:**
+           - Konsumsi listrik sering berubah secara **instan** (bukan smooth/kontinu)
+           - Contoh: AC nyala → langsung naik 2 kW (step function)
+           - Aproksimasi linear (Trapezoidal) lebih cocok untuk step function
+           - Aproksimasi parabola (Simpson) akan "membengkokkan" step dan menambah error
+        
+        3. **Step Size Sangat Kecil (h = 1/60 jam):**
+           - Dengan 10,080 data points dalam 1 minggu, resolusi data sangat tinggi
+           - Error teoritis $O(h^4)$ vs $O(h^2)$ menjadi **tidak signifikan** ketika $h$ sangat kecil
+           - Contoh: Jika $h = 0.01$, maka $h^2 = 0.0001$ dan $h^4 = 0.00000001$ (hampir sama)
+        
+        4. **Composite Error Propagation:**
+           - Simpson 1/3 menghitung integral per 2 interval (butuh 3 titik)
+           - Jika ada 1 titik outlier, error akan menyebar ke beberapa interval
+           - Trapezoidal menghitung per 1 interval (2 titik) → error lebih terlokalisir
+        """
+    else:
+        best_method = "Simpson 1/3"
+        best_error = error_simp13_rel
+        reason = """
+        **Mengapa Simpson 1/3 Lebih Baik?**
+        
+        Dalam kasus ini, Simpson 1/3 memberikan hasil lebih akurat karena:
+        
+        1. **Data Memiliki Komponen Smooth:**
+           - Meskipun ada fluktuasi, tren keseluruhan cukup halus
+           - Aproksimasi parabola lebih cocok untuk kurva smooth
+        
+        2. **Step Size Cukup Besar:**
+           - Error $O(h^4)$ lebih unggul dibanding $O(h^2)$ pada step size moderate
+        
+        3. **Noise Minimal:**
+           - Data sudah di-clean dengan baik (missing values dihapus)
+           - Simpson dapat bekerja optimal tanpa terganggu noise
+        """
+    
+    st.markdown(f"""
+    ### 🏆 Metode Terbaik: **{best_method}** (Error: {best_error:.4f}%)
+    
+    {reason}
+    
+    ---
+    
+    ### 📊 Ringkasan Hasil:
+    
+    | Aspek | Hasil |
+    |-------|-------|
+    | **Total Energi (Richardson)** | {val_richardson:.2f} kWh |
+    | **Total Energi (Trapezoidal)** | {val_trap:.2f} kWh (Error: {error_trap_rel:.4f}%) |
+    | **Total Energi (Simpson 1/3)** | {val_simp13:.2f} kWh (Error: {error_simp13_rel:.4f}%) |
+    | **Estimasi Biaya (Rp 1.444/kWh)** | Rp {val_richardson * 1444:,.0f} |
+    | **Jumlah Data Points** | {len(power_minute):,} titik |
+    | **Step Size (h)** | {h_minute:.6f} jam (1 menit) |
+    
+    ### 💡 Implikasi Praktis:
+    
+    1. **Untuk Billing System:**
+       - Error < 0.5% sudah sangat acceptable untuk tagihan listrik
+       - Metode {best_method} cukup akurat untuk implementasi production
+    
+    2. **Efisiensi Komputasi:**
+       - Trapezoidal: O(n) → Sangat cepat untuk real-time processing
+       - Simpson 1/3: O(n) tapi butuh check interval genap → Sedikit overhead
+       - **Rekomendasi:** Gunakan Trapezoidal untuk sistem embedded/IoT
+    
+    3. **Trade-off Akurasi vs Kompleksitas:**
+       - Richardson: Paling akurat tapi butuh 2x komputasi
+       - {best_method}: Balance optimal antara akurasi dan kecepatan
+    
+    ### 🎯 Kesimpulan Akhir:
+    
+    Untuk dataset konsumsi listrik dengan karakteristik:
+    - ✅ Resolusi tinggi (data per menit)
+    - ✅ Fluktuasi diskrit (step-wise changes)
+    - ✅ Noise dari sensor real-world
+    
+    **Metode {best_method}** adalah pilihan terbaik karena:
+    - Error hanya **{best_error:.4f}%** (sangat kecil)
+    - Implementasi sederhana dan cepat
+    - Robust terhadap karakteristik data real-world
+    
+    > **Catatan Penting:** Hasil ini menunjukkan bahwa **kompleksitas metode tidak selalu berbanding lurus dengan akurasi**. 
+    > Pemilihan metode harus mempertimbangkan **karakteristik data** dan **konteks aplikasi**.
+    """)
 # Di TAB 2: DIFERENSIASI NUMERIK (Ganti bagian slider dan visualisasi)
 
 with tabs[1]:

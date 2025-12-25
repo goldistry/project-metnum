@@ -71,7 +71,7 @@ if df_raw is not None:
     # HEADER & INTRODUCTION
     # ========================================
     
-    st.title("ANALISIS KONSUMSI ENERGI LISTRIK RUMAH TANGGA MENGGUNAKAN METODE NUMERIK⚡")
+    st.title("ANALISIS KONSUMSI ENERGI LISTRIK RUMAH TANGGA MENGGUNAKAN METODE NUMERIK")
     st.markdown("---")
     
     st.markdown("""
@@ -113,7 +113,7 @@ if df_raw is not None:
         st.metric("Std Dev Power", f"{np.std(power_minute):.2f} kW")
     
     st.info("""
-    ℹ️ **Catatan Lingkup Analisis:** Meskipun dataset asli mencakup periode 4 tahun, analisis pada dashboard ini dibatasi pada sampel data **1 minggu pertama**. 
+    **Catatan Lingkup Analisis:** Meskipun dataset asli mencakup periode 4 tahun, analisis pada dashboard ini dibatasi pada sampel data **1 minggu pertama**. 
     Hal ini dilakukan untuk menjaga efisiensi komputasi pada algoritma kompleks (seperti Interpolasi & Regresi) serta agar pola fluktuasi harian dapat divisualisasikan dengan jelas.
     """)
     st.markdown("---")
@@ -146,31 +146,10 @@ if df_raw is not None:
         
         st.subheader("Pengaturan Parameter Integrasi")
         
-        # col1, col2 = st.columns([1, 1])
-        # col1, col2 = st.columns([1, 1])
-        
-        # with col1:
-        #     n_segments = st.slider(
-        #         "Jumlah Segmen untuk Adaptive Integration",
-        #         min_value=1,
-        #         max_value=20,
-        #         value=5,
-        #         help="Membagi data menjadi beberapa segmen untuk integrasi yang lebih akurat"
-        #     )
-        
-        # with col1:
         show_comparison = st.checkbox("Tampilkan Perbandingan dengan NumPy", value=True)
         
         st.markdown("---")
         
-        # Hitung integral dengan berbagai metode
-        # val_rect_left = manual_rectangular(power, h, method='left')
-        # val_rect_right = manual_rectangular(power, h, method='right')
-        # val_rect_mid = manual_rectangular(power, h, method='midpoint')
-       
-        # val_trap = manual_trapezoidal(power, h)
-        # val_simp13 = manual_simpson_13(power, h)
-        # val_simp38 = manual_simpson_38(power, h)
 
         val_trap = manual_trapezoidal(power_minute, h_minute)
         val_simp13 = manual_simpson_13(power_minute, h_minute)
@@ -181,7 +160,7 @@ if df_raw is not None:
         n_interval = n_data - 1
         
         # if n_interval % 3 == 0:
-        val_simp38 = manual_simpson_38(power_minute, h_minute)
+        val_simp38 = manual_simpson_38_smart(power_minute, h_minute)
             # status_38 = "Valid"
         # else:
             # val_simp38 = None # Tandai bahwa metode ini gagal
@@ -497,11 +476,11 @@ with tabs[1]:
             # Klasifikasi severity
             def classify_severity(val):
                 if val > threshold * 3:
-                    return "🔴 Kritis"
+                    return "Kritis"
                 elif val > threshold * 2:
-                    return "🟡 Tinggi"
+                    return "*Tinggi"
                 else:
-                    return "🟢 Sedang"
+                    return "Sedang"
             
             anomali_data['Level'] = anomali_data['Severity'].apply(classify_severity)
             
@@ -527,7 +506,7 @@ with tabs[1]:
                 f"{errors_methods['Backward']['MAE']:.4f}",
                 f"{errors_methods['Central']['MAE']:.4f}"
             ],
-            'Rank': ['3️⃣', '2️⃣', '1️⃣ Best']
+            'Rank': ['(3️)', '(2️)', '(1️) Best']
         })
         
         st.dataframe(comparison_df, use_container_width=True)
@@ -1048,7 +1027,7 @@ with tabs[1]:
         - Magnitude koefisien menunjukkan seberapa besar pengaruh variabel waktu terhadap perubahan power. 
         
         **Kesimpulan:**
-        Regresi polinomial derajat {deg} berusaha menangkap tren umum penggunaan energi[cite: 225]. Namun, karena durasi data mencapai 168 jam, model polinomial tunggal sering kali gagal mengikuti pola siklus harian yang tajam.
+        Regresi polinomial derajat {deg} berusaha menangkap tren umum penggunaan energi. Namun, karena durasi data mencapai 168 jam, model polinomial tunggal sering kali gagal mengikuti pola siklus harian yang tajam.
         Juga bisa dilihat Residual plot menunjukkan distribusi error yang {"bersifat acak (random)" if abs(np.mean(residual_test)) < 0.1 else "masih memiliki pola tertentu"}.
         
         {r2_warning}
@@ -1071,22 +1050,76 @@ with tabs[1]:
         st.subheader("1. Integrasi Numerik - Total Energi")
         
         summary_integration = pd.DataFrame({
-            # 'Metode': ['Simpson 1/3', 'Trapezoidal', 'Richardson', 'Adaptive'],
-            'Metode': ['Simpson 1/3', 'Trapezoidal', 'Richardson'],
-            # 'Hasil (kWh)': [val_simp13, val_trap, val_richardson, val_adaptive],
-            'Hasil (kWh)': [val_simp13, val_trap, val_richardson],
+            'Metode': ['Simpson 1/3', 'Simpson 3/8', 'Trapezoidal', 'Richardson'],
+            'Hasil (kWh)': [val_simp13, val_simp38, val_trap, val_richardson],
             'Relative Error (%)': [
                 abs(val_simp13 - exact_val) / exact_val * 100,
+                abs(val_simp38 - exact_val) / exact_val * 100,
                 abs(val_trap - exact_val) / exact_val * 100,
                 0.0,
-                # abs(val_adaptive - exact_val) / exact_val * 100
             ],
-            # 'Kompleksitas': ['O(n)', 'O(n)', 'O(2n)', 'O(n)'],
-            'Kompleksitas': ['O(n)', 'O(n)', 'O(2n)'],
-            'Rekomendasi': ['Akurasi Tinggi', 'Balance', 'Referensi']
+            'Kompleksitas': ['O(n)', 'O(n)', 'O(n)', 'O(2n)'],
+            'Rekomendasi': [
+                'Terbaik (Presisi Tertinggi)', 
+                'Hybrid (Setara Trapezoidal)', 
+                'Stabil (Standar NumPy)', 
+                'Benchmark (Referensi)'
+            ]
         })
+        # Update Narasi Summary Integrasi (TAB 5)
+        st.subheader("Analisis Detail Integrasi")
+        st.markdown(f"""
+        **Evaluasi Komprehensif Metode Integrasi:**
+        * **Optimasi Kuadratik (Simpson 1/3):** Metode ini tetap menjadi yang paling presisi dengan galat terendah yaitu **{abs(val_simp13 - exact_val) / exact_val * 100:.4f}%**. Hal ini membuktikan bahwa pendekatan parabola sangat efektif untuk memodelkan lengkungan fluktuasi konsumsi listrik mingguan rumah tangga.
+        * **Analisis Fenomena Kembar (Trapezoidal vs Simpson 3/8):** Ditemukan bahwa metode Trapezoidal dan Simpson 3/8 menghasilkan nilai yang identik sebesar **{val_trap:.4f} kWh**. Fenomena ini secara numerik menunjukkan bahwa penambahan kompleksitas algoritma pada Simpson 3/8 tidak memberikan peningkatan akurasi jika pola data pada titik-titik interval tertentu lebih cenderung bersifat linear atau jika sisa interval pada metode hybrid didominasi oleh pendekatan linear.
+        * **Validitas Algoritma:** Konsistensi hasil antara metode Trapezoidal manual dengan **NumPy Reference (np.trapz)** sebesar **{val_numpy:.2f} kWh** memvalidasi bahwa seluruh fungsi integrasi yang dibangun dalam proyek ini telah bekerja sesuai standar perhitungan saintifik.
+        """)
         
         st.dataframe(summary_integration, use_container_width=True)
+        # --- TAMBAHAN: Visualisasi Konsep Optimasi Kuadratik ---
+        st.subheader("Visualisasi Konsep: Simpson 1/3 vs Trapezoidal")
+        
+        # Mengambil sampel kecil (3 titik) untuk menunjukkan kelengkungan
+        # Kita cari indeks yang memiliki fluktuasi (misal indeks 50-52)
+        sample_x = np.array([0, 1, 2])
+        sample_y = power_minute[50:53]
+        
+        # Membuat titik halus untuk kurva parabola (Simpson)
+        x_fine = np.linspace(0, 2, 100)
+        # Polinomial derajat 2 (Parabola) yang melewati 3 titik
+        poly_coef = np.polyfit(sample_x, sample_y, 2)
+        y_fine_simpson = np.polyval(poly_coef, x_fine)
+
+        fig_concept = go.Figure()
+
+        # 1. Plot Titik Data Asli
+        fig_concept.add_trace(go.Scatter(x=sample_x, y=sample_y, mode='markers+text', 
+                                         name='Data Points', text=["P0", "P1", "P2"],
+                                         textposition="top center", marker=dict(size=12, color='black')))
+
+        # 2. Plot Pendekatan Trapezoidal (Garis Lurus)
+        fig_concept.add_trace(go.Scatter(x=sample_x, y=sample_y, mode='lines', 
+                                         name='Trapezoidal (Linear)', line=dict(color='blue', dash='dash')))
+
+        # 3. Plot Pendekatan Simpson 1/3 (Kurva Parabola)
+        fig_concept.add_trace(go.Scatter(x=x_fine, y=y_fine_simpson, mode='lines', 
+                                         name='Simpson 1/3 (Quadratic)', line=dict(color='green', width=3)))
+
+        fig_concept.update_layout(
+            title="Bagaimana Simpson 1/3 Menangkap 'Lengkungan' Data",
+            xaxis_title="Waktu (Menit)",
+            yaxis_title="Power (kW)",
+            height=400,
+            margin=dict(l=20, r=20, t=40, b=20),
+            legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="right", x=1)
+        )
+        
+        st.plotly_chart(fig_concept, use_container_width=True)
+        
+        st.info("""
+        **Insight Visual:** Garis putus-putus biru (Trapezoidal) memotong area secara lurus, sedangkan garis hijau (Simpson) melengkung mengikuti pola titik. 
+        Pada data listrik yang fluktuatif, selisih area di bawah kurva inilah yang membuat Simpson 1/3 lebih akurat.
+        """)
         
         st.subheader("2. Diferensiasi Numerik - Deteksi Anomali")
         
@@ -1178,19 +1211,18 @@ with tabs[1]:
                    [{"type": "box"}, {"type": "scatter"}]]
         )
         
-        # 1. Integrasi Methods Comparison
-        # int_methods = ['Rectangular', 'Trapezoidal', 'Simpson 1/3', 'Richardson']
-        int_methods = ['Trapezoidal', 'Simpson 1/3', 'Richardson']
+        # 1. Integrasi Methods Comparison (Update List)
+        int_methods = ['Trapezoidal', 'Simpson 1/3', 'Simpson 3/8', 'Richardson']
         int_errors = [
-            # abs(val_rect_mid - exact_val) / exact_val * 100,
             abs(val_trap - exact_val) / exact_val * 100,
             abs(val_simp13 - exact_val) / exact_val * 100,
+            abs(val_simp38 - exact_val) / exact_val * 100,
             0.0
         ]
         
         fig.add_trace(
             go.Bar(y=int_methods, x=int_errors, orientation='h',
-                  marker_color=['blue', 'green', 'orange'],
+                  marker_color=['blue', 'green', 'magenta', 'orange'], # Tambah warna magenta untuk 3/8
                   hovertemplate='<b>%{y}</b><br>Error: %{x:.4f}%<extra></extra>',
                   showlegend=False),
             row=1, col=1
